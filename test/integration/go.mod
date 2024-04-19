@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/IBM/idemix v0.0.2-0.20231011101252-a4feda90f3f7
-	github.com/anoideaopen/acl v0.0.0-20240411072458-5618bcde7ec8
+	github.com/anoideaopen/acl v0.0.0-20240417160013-12180a111366
 	github.com/anoideaopen/foundation v0.0.0-20240412063944-9a91dc2600fa
 	github.com/anoideaopen/robot v0.0.0-20240418144027-49f59782e8cd
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce

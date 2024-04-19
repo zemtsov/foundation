@@ -30,7 +30,8 @@ var _ = Describe("Health", func() {
 	})
 
 	AfterEach(func() {
-		os.RemoveAll(testDir)
+		err := os.RemoveAll(testDir)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("Redis health checks", func() {
