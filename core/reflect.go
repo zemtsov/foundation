@@ -24,12 +24,14 @@ type In struct {
 
 // Fn is a struct for function
 type Fn struct {
-	fn        reflect.Value
-	query     bool
-	noBatch   bool
-	needsAuth bool
-	in        []In
-	out       bool
+	Name           string
+	FName          string
+	fn             reflect.Value
+	query          bool
+	noBatch        bool
+	needsAuth      bool
+	in             []In
+	hasOutputValue bool
 }
 
 func (f *Fn) getInputs(method reflect.Method) error {
@@ -171,36 +173,48 @@ func parseContractMethods(in BaseContractInterface) (ContractMethods, error) {
 			continue
 		}
 
+		var methodNameTruncated string
 		switch {
-		case len(method.Name) > 4 && method.Name[0:4] == noBatchPrefix:
+		case strings.HasPrefix(method.Name, txPrefix):
+			methodNameTruncated = strings.TrimPrefix(method.Name, txPrefix)
+
+		case strings.HasPrefix(method.Name, noBatchPrefix):
 			nb = true
-			method.Name = method.Name[4:]
-		case len(method.Name) > 5 && method.Name[0:5] == queryPrefix:
+			methodNameTruncated = strings.TrimPrefix(method.Name, noBatchPrefix)
+
+		case strings.HasPrefix(method.Name, queryPrefix):
 			query = true
 			nb = true
-			method.Name = method.Name[5:]
-		case len(method.Name) > 2 && method.Name[0:2] == txPrefix:
-			method.Name = method.Name[2:]
+			methodNameTruncated = strings.TrimPrefix(method.Name, queryPrefix)
+
 		default:
 			continue
 		}
 
-		name := toLowerFirstLetter(method.Name)
-
-		if _, ok := out[name]; ok {
-			return nil, fmt.Errorf("%w, method: %s", ErrMethodAlreadyDefined, name)
+		if len(methodNameTruncated) == 0 {
+			continue
 		}
 
-		out[name] = &Fn{
+		functionName := toLowerFirstLetter(methodNameTruncated) // example: QuerySwapGet => swapGet
+
+		if _, ok := out[functionName]; ok {
+			return nil, fmt.Errorf("%w, method: %s", ErrMethodAlreadyDefined, functionName)
+		}
+
+		out[functionName] = &Fn{
+			Name:    method.Name,
+			FName:   functionName,
 			fn:      method.Func,
 			noBatch: nb,
 			query:   query,
 		}
-		if err := out[name].getInputs(method); err != nil {
+
+		err := out[functionName].getInputs(method)
+		if err != nil {
 			return nil, err
 		}
-		var err error
-		out[name].out, err = checkOut(method)
+
+		out[functionName].hasOutputValue, err = checkOut(method)
 		if err != nil {
 			return nil, err
 		}

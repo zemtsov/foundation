@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/anoideaopen/foundation/core/balance"
+	corereflect "github.com/anoideaopen/foundation/core/reflect"
 	"github.com/anoideaopen/foundation/core/telemetry"
-	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/hlfcreator"
 	"github.com/anoideaopen/foundation/internal/config"
 	"github.com/anoideaopen/foundation/proto"
@@ -438,7 +438,7 @@ func (cc *ChainCode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 
 	// Apply config on all layers: base contract (SKI's & chaincode options),
 	// token base attributes and extended token parameters.
-	if err = applyConfig(&cc.contract, stub, cfgBytes); err != nil {
+	if err = applyConfig(cc.contract, stub, cfgBytes); err != nil {
 		return shim.Error("applying configutarion: " + err.Error())
 	}
 
@@ -739,44 +739,50 @@ func (cc *ChainCode) callMethod(
 	traceCtx, span := cc.contract.TracingHandler().StartNewSpan(traceCtx, "chaincode.CallMethod")
 	defer span.End()
 
+	if sender != nil {
+		args = append([]string{sender.AddrString()}, args...) // prepend sender address
+	}
 	span.SetAttributes(attribute.StringSlice("args", args))
-	span.AddEvent("convert to call")
-	values, err := doConvertToCall(stub, method, args)
+
+	span.AddEvent("copy contract")
+	v := copyContractWithConfig(traceCtx, cc.contract, stub, cfgBytes)
+
+	span.AddEvent("call")
+	result, err := corereflect.Call(v, method.Name, args...)
 	if err != nil {
 		return nil, err
 	}
-	if sender != nil {
-		span.SetAttributes(attribute.String("sender addr", sender.AddrString()))
-		values = append([]reflect.Value{
-			reflect.ValueOf(types.NewSenderFromAddr((*types.Address)(sender))),
-		}, values...)
+
+	if len(result) < 1 || len(result) > 2 {
+		msg := fmt.Sprintf("invalid number of return values: %d", len(result))
+		span.SetStatus(codes.Error, msg)
+		return nil, errors.New(msg)
 	}
 
-	span.AddEvent("copy contract")
-	contract, _ := copyContractWithConfig(traceCtx, cc.contract, stub, cfgBytes)
-
-	span.AddEvent("call")
-	out := method.fn.Call(append([]reflect.Value{contract}, values...))
-	errInt := out[0].Interface()
-	if method.out {
-		errInt = out[1].Interface()
+	var errValue any
+	if !method.hasOutputValue {
+		errValue = result[0] // first value is the error
+	} else {
+		errValue = result[1] // second value is	the error
 	}
-	if errInt != nil {
-		err, ok := errInt.(error)
+
+	if errValue != nil {
+		err, ok := errValue.(error)
 		if !ok {
 			span.SetStatus(codes.Error, requireInterfaceErrMsg)
 			return nil, errors.New(requireInterfaceErrMsg)
 		}
+
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
-	if method.out {
-		span.SetStatus(codes.Ok, "")
-		return json.Marshal(out[0].Interface())
-	}
 	span.SetStatus(codes.Ok, "")
-	return nil, nil
+	if !method.hasOutputValue {
+		return nil, nil
+	}
+
+	return json.Marshal(result[0])
 }
 
 // doConvertToCall prepares the arguments for a chaincode method call by converting each
@@ -899,10 +905,10 @@ func doPrepareToSave(
 // an interface to the copied contract.
 func copyContractWithConfig(
 	traceCtx telemetry.TraceContext,
-	orig BaseContractInterface,
+	orig any,
 	stub shim.ChaincodeStubInterface,
 	cfgBytes []byte,
-) (reflect.Value, BaseContractInterface) {
+) any {
 	cp := reflect.New(reflect.ValueOf(orig).Elem().Type())
 	val := reflect.ValueOf(orig).Elem()
 	for i := 0; i < val.NumField(); i++ {
@@ -911,17 +917,15 @@ func copyContractWithConfig(
 		}
 	}
 
-	contract, ok := cp.Interface().(BaseContractInterface)
-	if !ok {
-		return cp, nil
+	iface := cp.Interface()
+
+	if contract, ok := iface.(BaseContractInterface); ok {
+		_ = applyConfig(contract, stub, cfgBytes)
+		contract.setTraceContext(traceCtx)
+		contract.setTracingHandler(contract.TracingHandler())
 	}
 
-	_ = applyConfig(&contract, stub, cfgBytes)
-
-	contract.setTraceContext(traceCtx)
-	contract.setTracingHandler(contract.TracingHandler())
-
-	return cp, contract
+	return iface
 }
 
 // Start begins the chaincode execution based on the environment configuration. It decides whether to
@@ -1007,15 +1011,15 @@ func readTLSConfigFromEnv() ([]byte, []byte, []byte, error) {
 // If any step in the configuration application process fails, an error is returned with details about
 // the specific error encountered.
 func applyConfig(
-	bci *BaseContractInterface,
+	bci BaseContractInterface,
 	stub shim.ChaincodeStubInterface,
 	cfgBytes []byte,
 ) error {
 	// WARN: if stub is not set,
 	// it should be thrown through it into all methods before CallMethod.
-	(*bci).setStub(stub)
+	bci.setStub(stub)
 
-	ccbc, ok := (*bci).(ContractConfigurable)
+	ccbc, ok := bci.(ContractConfigurable)
 	if !ok {
 		return errors.New("chaincode is not ContractConfigurable")
 	}
@@ -1033,7 +1037,7 @@ func applyConfig(
 		return fmt.Errorf("applying base config: %w", err)
 	}
 
-	if tc, ok := (*bci).(TokenConfigurable); ok {
+	if tc, ok := bci.(TokenConfigurable); ok {
 		tokenCfg, err := config.TokenConfigFromBytes(cfgBytes)
 		if err != nil {
 			return fmt.Errorf("parsing token config: %w", err)
@@ -1044,7 +1048,7 @@ func applyConfig(
 		}
 	}
 
-	if ec, ok := (*bci).(ExternalConfigurable); ok {
+	if ec, ok := bci.(ExternalConfigurable); ok {
 		if err = ec.ApplyExtConfig(cfgBytes); err != nil {
 			return err
 		}
