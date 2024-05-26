@@ -14,7 +14,7 @@ import (
 
 	"github.com/anoideaopen/foundation/core/balance"
 	"github.com/anoideaopen/foundation/core/reflectx"
-	stringsx "github.com/anoideaopen/foundation/core/stringsx"
+	"github.com/anoideaopen/foundation/core/stringsx"
 	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/hlfcreator"
 	"github.com/anoideaopen/foundation/internal/config"
@@ -80,6 +80,7 @@ const (
 	CancelCCTransferFrom = "cancelCCTransferFrom"
 	DeleteCCTransferFrom = "deleteCCTransferFrom"
 	CreateIndex          = "createIndex"
+	ExecuteTasks         = "executeTasks"
 )
 
 // TokenConfigurable is an interface that defines methods for validating, applying, and
@@ -591,6 +592,23 @@ func (cc *ChainCode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 			span.SetStatus(codes.Error, errMsg)
 			return shim.Error(errMsg)
 		}
+
+	case ExecuteTasks:
+		bytes, err := TasksExecutorHandler(
+			traceCtx,
+			stub,
+			cfgBytes,
+			arguments,
+			cc,
+		)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to execute method %s: txID %s: %s", ExecuteTasks, stub.GetTxID(), err)
+			Logger().Error(errMsg)
+			span.SetStatus(codes.Error, errMsg)
+			return shim.Error(errMsg)
+		}
+
+		return shim.Success(bytes)
 	}
 
 	method, err := cc.Method(functionName)
