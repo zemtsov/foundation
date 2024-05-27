@@ -77,20 +77,10 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 		return nil, nil, 0, err
 	}
 
-	// Determine the number of signatures needed.
-	requiredSignatures := 1 // One signature is required by default.
-	if invocation.signersCount > 1 {
-		if acl.GetAddress().GetSignaturePolicy() != nil {
-			requiredSignatures = int(acl.GetAddress().GetSignaturePolicy().GetN())
-		} else {
-			requiredSignatures = invocation.signersCount // If there is no rule in the ACL, all signatures are required.
-		}
-	}
-
 	// Form a message to verify the signature.
 	message := []byte(fn + strings.Join(args[:len(args)-invocation.signersCount], ""))
 
-	if requiredSignatures, err = validateSignaturesInInvocation(invocation, message, requiredSignatures); err != nil {
+	if err = validateSignaturesInInvocation(invocation, message); err != nil {
 		return nil, nil, 0, err
 	}
 
@@ -112,8 +102,7 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 func validateSignaturesInInvocation(
 	invocation *invocationDetails,
 	message []byte,
-	requiredSignatures int,
-) (int, error) {
+) error {
 	var (
 		digestSHA3 []byte
 		digestGOST []byte
@@ -161,17 +150,15 @@ func validateSignaturesInInvocation(
 			}
 			valid, err = gost.Verify(publicKey, digestGOST, signature)
 			if err != nil {
-				return requiredSignatures, fmt.Errorf("incorrect signature: %w", err)
+				return fmt.Errorf("incorrect signature: %w", err)
 			}
 		}
 
 		if !valid {
-			return requiredSignatures, errors.New("incorrect signature")
+			return errors.New("incorrect signature")
 		}
-
-		requiredSignatures--
 	}
-	return requiredSignatures, nil
+	return nil
 }
 
 func checkACLSignerStatus(stub shim.ChaincodeStubInterface, signers []string) (*pb.AclResponse, error) {
