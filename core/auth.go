@@ -55,7 +55,7 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 		return nil, args, 0, nil
 	}
 
-	invocationDetails, err := parseInvocationDetails(fnMetadata, args)
+	invocation, err := parseInvocationDetails(fnMetadata, args)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -63,13 +63,13 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 	// Check the correspondence between the name and the channel of the chancode.
 	if err = checkChaincodeAndChannelName(
 		stub,
-		invocationDetails.chaincodeNameArg,
-		invocationDetails.channelNameArg,
+		invocation.chaincodeNameArg,
+		invocation.channelNameArg,
 	); err != nil {
 		return nil, nil, 0, err
 	}
 
-	signers := invocationDetails.signatureArgs[:invocationDetails.signersCount]
+	signers := invocation.signatureArgs[:invocation.signersCount]
 
 	// Check the ACL (access control list).
 	acl, err := checkACLSignerStatus(stub, signers)
@@ -79,31 +79,55 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 
 	// Determine the number of signatures needed.
 	requiredSignatures := 1 // One signature is required by default.
-	if invocationDetails.signersCount > 1 {
+	if invocation.signersCount > 1 {
 		if acl.GetAddress().GetSignaturePolicy() != nil {
 			requiredSignatures = int(acl.GetAddress().GetSignaturePolicy().GetN())
 		} else {
-			requiredSignatures = invocationDetails.signersCount // If there is no rule in the ACL, all signatures are required.
+			requiredSignatures = invocation.signersCount // If there is no rule in the ACL, all signatures are required.
 		}
 	}
 
 	// Form a message to verify the signature.
-	var (
-		message = []byte(fn + strings.Join(args[:len(args)-invocationDetails.signersCount], ""))
+	message := []byte(fn + strings.Join(args[:len(args)-invocation.signersCount], ""))
 
+	if requiredSignatures, err = validateSignaturesInInvocation(invocation, message, requiredSignatures); err != nil {
+		return nil, nil, 0, err
+	}
+
+	// Update the address if it has changed.
+	if err = helpers.AddAddrIfChanged(stub, acl.GetAddress()); err != nil {
+		return nil, nil, 0, err
+	}
+
+	// Convert nonce from a string to a number.
+	nonce, err = strconv.ParseUint(invocation.nonceStringArg, 10, 64)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	// Return the signer's address, method arguments, and nonce.
+	return acl.GetAddress().GetAddress(), args[3 : 3+fnMetadata.in], nonce, nil
+}
+
+func validateSignaturesInInvocation(
+	invocation *invocationDetails,
+	message []byte,
+	requiredSignatures int,
+) (int, error) {
+	var (
 		digestSHA3 []byte
 		digestGOST []byte
+		err        error
 	)
 
-	// Checking signatures.
-	for i := 0; i < invocationDetails.signersCount; i++ {
-		if invocationDetails.signatureArgs[i+invocationDetails.signersCount] == "" {
+	for i := 0; i < invocation.signersCount; i++ {
+		if invocation.signatureArgs[i+invocation.signersCount] == "" {
 			continue // Skip the blank signatures.
 		}
 
 		var (
-			publicKey = base58.Decode(invocationDetails.signatureArgs[i])
-			signature = base58.Decode(invocationDetails.signatureArgs[i+invocationDetails.signersCount])
+			publicKey = base58.Decode(invocation.signatureArgs[i])
+			signature = base58.Decode(invocation.signatureArgs[i+invocation.signersCount])
 		)
 
 		// Verify the signature ED25519, ECDSA or GOST 34.10 2012
@@ -137,30 +161,17 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 			}
 			valid, err = gost.Verify(publicKey, digestGOST, signature)
 			if err != nil {
-				return nil, nil, 0, fmt.Errorf("incorrect signature: %w", err)
+				return requiredSignatures, fmt.Errorf("incorrect signature: %w", err)
 			}
 		}
 
 		if !valid {
-			return nil, nil, 0, errors.New("incorrect signature")
+			return requiredSignatures, errors.New("incorrect signature")
 		}
 
 		requiredSignatures--
 	}
-
-	// Update the address if it has changed.
-	if err = helpers.AddAddrIfChanged(stub, acl.GetAddress()); err != nil {
-		return nil, nil, 0, err
-	}
-
-	// Convert nonce from a string to a number.
-	nonce, err = strconv.ParseUint(invocationDetails.nonceStringArg, 10, 64)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-
-	// Return the signer's address, method arguments, and nonce.
-	return acl.GetAddress().GetAddress(), args[3 : 3+fnMetadata.in], nonce, nil
+	return requiredSignatures, nil
 }
 
 func checkACLSignerStatus(stub shim.ChaincodeStubInterface, signers []string) (*pb.AclResponse, error) {
