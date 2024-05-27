@@ -1,8 +1,11 @@
 package core
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -103,22 +106,35 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 			signature = base58.Decode(invocationDetails.signatureArgs[i+invocationDetails.signersCount])
 		)
 
-		// Depending on the key length we verify the signature ED25519 or GOST 34.10 2012
+		// Verify the signature ED25519, ECDSA or GOST 34.10 2012
 		valid := false
-		switch len(publicKey) {
-		case ed25519.PublicKeySize:
+		if len(publicKey) == ed25519.PublicKeySize {
 			if digestSHA3 == nil {
 				digestSHA3Raw := sha3.Sum256(message)
 				digestSHA3 = digestSHA3Raw[:]
 			}
-
 			valid = ed25519.Verify(publicKey, digestSHA3, signature)
-		case int(gost3410.Mode2012):
+		}
+
+		const KeyLengthECDSA = 64
+		if !valid && len(publicKey) == KeyLengthECDSA {
+			if digestSHA3 == nil {
+				digestSHA3Raw := sha3.Sum256(message)
+				digestSHA3 = digestSHA3Raw[:]
+			}
+			ecdsaKey := &ecdsa.PublicKey{
+				Curve: elliptic.P256(),
+				X:     new(big.Int).SetBytes(publicKey[:32]),
+				Y:     new(big.Int).SetBytes(publicKey[32:]),
+			}
+			valid = ecdsa.VerifyASN1(ecdsaKey, digestSHA3, signature)
+		}
+
+		if !valid && len(publicKey) == int(gost3410.Mode2012) {
 			if digestGOST == nil {
 				digestGOSTRaw := gost.Sum256(message)
 				digestGOST = digestGOSTRaw[:]
 			}
-
 			valid, err = gost.Verify(publicKey, digestGOST, signature)
 			if err != nil {
 				return nil, nil, 0, fmt.Errorf("incorrect signature: %w", err)

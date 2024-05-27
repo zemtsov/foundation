@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -80,24 +81,41 @@ const (
 	shouldNotBeHereMsg = "shouldn't be here"
 )
 
+const (
+	KeyTypeEd25519 = iota
+	KeyTypeGOST
+	KeyTypeECDSA
+)
+
+type KeyType int
+
 // Wallet is a wallet
 type Wallet struct {
 	ledger *Ledger
 
+	keyType KeyType
+
 	pKey ed25519.PublicKey
 	sKey ed25519.PrivateKey
 
-	// Additional GOST Keys.
-	primaryGOST bool
-	pKeyGOST    *gost3410.PublicKey
-	sKeyGOST    *gost3410.PrivateKey
+	pKeyECDSA *ecdsa.PublicKey
+	sKeyECDSA *ecdsa.PrivateKey
 
-	addr     string
-	addrGOST string
+	// Additional GOST Keys.
+	pKeyGOST *gost3410.PublicKey
+	sKeyGOST *gost3410.PrivateKey
+
+	addr      string
+	addrECDSA string
+	addrGOST  string
 }
 
-func (w *Wallet) SetGOSTPrimary(primary bool) {
-	w.primaryGOST = primary
+func (w *Wallet) UseECDSAKey() {
+	w.keyType = KeyTypeECDSA
+}
+
+func (w *Wallet) UseGOSTKey() {
+	w.keyType = KeyTypeGOST
 }
 
 // ChangeKeys change private key, then public key will be derived and changed too
@@ -113,11 +131,14 @@ func (w *Wallet) ChangeKeys(sKey ed25519.PrivateKey) error {
 
 // Address returns the address of the wallet
 func (w *Wallet) Address() string {
-	return w.addr
-}
-
-func (w *Wallet) AddressGOST() string {
-	return w.addrGOST
+	switch w.keyType {
+	case KeyTypeGOST:
+		return w.addrGOST
+	case KeyTypeECDSA:
+		return w.addrECDSA
+	default:
+		return w.addr
+	}
 }
 
 // PubKey returns the public key of the wallet
@@ -317,6 +338,17 @@ func (w *Wallet) BatchedInvoke(ch, fn string, args ...string) (string, TxRespons
 	return txID, TxResponse{}
 }
 
+func (w *Wallet) publicKeyBytes() []byte {
+	switch w.keyType {
+	case KeyTypeGOST:
+		return w.pKeyGOST.Raw()
+	case KeyTypeECDSA:
+		return append(w.pKeyECDSA.X.Bytes(), w.pKeyECDSA.Y.Bytes()...)
+	default:
+		return w.pKey
+	}
+}
+
 func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 	// Artificial delay to update the nonce value.
 	time.Sleep(time.Millisecond * 5)
@@ -326,12 +358,7 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 
 	// Forming a message for signature, including function name,
 	// empty string (placeholder), channel name, arguments and nonce.
-	var publicKey []byte
-	if !w.primaryGOST {
-		publicKey = w.pKey
-	} else {
-		publicKey = w.pKeyGOST.Raw()
-	}
+	publicKey := w.publicKeyBytes()
 
 	messageChunks := []string{fn, "", ch, ch}
 	messageChunks = append(messageChunks, args...)                  // Adding call arguments.
@@ -343,12 +370,11 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 	var (
 		digest    []byte
 		signature []byte
+		err       error
 	)
-	if !w.primaryGOST {
-		digestRawSHA3 := sha3.Sum256(message)
-		digest = digestRawSHA3[:]
-		signature = ed25519.Sign(w.sKey, digest)
-	} else {
+
+	switch w.keyType {
+	case KeyTypeGOST:
 		digestRawGOST := gost.Sum256(message)
 		// Reverse the bytes for compatibility with client-side HSM.
 
@@ -357,6 +383,15 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 
 		signature, _ = w.sKeyGOST.SignDigest(digest, rand.Reader)
 		signature = reverseBytes(signature)
+	case KeyTypeECDSA:
+		digestRawSHA3 := sha3.Sum256(message)
+		digest = digestRawSHA3[:]
+		signature, err = ecdsa.SignASN1(rand.Reader, w.sKeyECDSA, digest)
+		require.NoError(w.ledger.t, err)
+	default:
+		digestRawSHA3 := sha3.Sum256(message)
+		digest = digestRawSHA3[:]
+		signature = ed25519.Sign(w.sKey, digest)
 	}
 
 	// We remove the function name from the message and add a caption.

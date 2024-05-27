@@ -2,6 +2,8 @@ package mock
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -236,31 +238,26 @@ func (ledger *Ledger) WaitChTransferTo(name string, id string, timeout time.Dura
 
 // NewWallet creates new wallet
 func (ledger *Ledger) NewWallet() *Wallet {
-	pKey, sKey, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(ledger.t, err)
-
-	sKeyGOST, err := gost3410.GenPrivateKey(
-		gost3410.CurveIdGostR34102001CryptoProXchAParamSet(),
-		gost3410.Mode2001,
-		rand.Reader,
-	)
-	require.NoError(ledger.t, err)
-
-	pKeyGOST, err := sKeyGOST.PublicKey()
-	require.NoError(ledger.t, err)
-
 	var (
-		hash     = sha3.Sum256(pKey)
-		hashGOST = sha3.Sum256(pKeyGOST.Raw())
+		pKey, sKey           = generateEd25519Keys(ledger.t)
+		pKeyGOST, sKeyGOST   = generateGOSTKeys(ledger.t)
+		pKeyECDSA, sKeyECDSA = generateECDSAKeys(ledger.t)
+		hash                 = sha3.Sum256(pKey)
+		hashGOST             = sha3.Sum256(pKeyGOST.Raw())
+		hashECDSA            = sha3.Sum256(append(pKeyECDSA.X.Bytes(), pKeyECDSA.Y.Bytes()...))
 	)
 	return &Wallet{
-		ledger:   ledger,
-		sKey:     sKey,
-		pKey:     pKey,
-		sKeyGOST: sKeyGOST,
-		pKeyGOST: pKeyGOST,
-		addr:     base58.CheckEncode(hash[1:], hash[0]),
-		addrGOST: base58.CheckEncode(hashGOST[1:], hashGOST[0]),
+		ledger:    ledger,
+		keyType:   KeyTypeEd25519,
+		sKey:      sKey,
+		pKey:      pKey,
+		sKeyECDSA: sKeyECDSA,
+		pKeyECDSA: pKeyECDSA,
+		sKeyGOST:  sKeyGOST,
+		pKeyGOST:  pKeyGOST,
+		addr:      base58.CheckEncode(hash[1:], hash[0]),
+		addrGOST:  base58.CheckEncode(hashGOST[1:], hashGOST[0]),
+		addrECDSA: base58.CheckEncode(hashECDSA[1:], hashECDSA[0]),
 	}
 }
 
@@ -296,10 +293,11 @@ func (ledger *Ledger) NewWalletFromKey(key string) *Wallet {
 	require.True(ledger.t, ok)
 	hash := sha3.Sum256(pub)
 	return &Wallet{
-		ledger: ledger,
-		sKey:   sKey,
-		pKey:   pub,
-		addr:   base58.CheckEncode(hash[1:], hash[0]),
+		ledger:  ledger,
+		keyType: KeyTypeEd25519,
+		sKey:    sKey,
+		pKey:    pub,
+		addr:    base58.CheckEncode(hash[1:], hash[0]),
 	}
 }
 
@@ -311,7 +309,13 @@ func (ledger *Ledger) NewWalletFromHexKey(key string) *Wallet {
 	pub, ok := sKey.Public().(ed25519.PublicKey)
 	require.True(ledger.t, ok)
 	hash := sha3.Sum256(pub)
-	return &Wallet{ledger: ledger, sKey: sKey, pKey: pub, addr: base58.CheckEncode(hash[1:], hash[0])}
+	return &Wallet{
+		ledger:  ledger,
+		keyType: KeyTypeEd25519,
+		sKey:    sKey,
+		pKey:    pub,
+		addr:    base58.CheckEncode(hash[1:], hash[0]),
+	}
 }
 
 func (ledger *Ledger) doInvoke(ch, txID, fn string, args ...string) string {
@@ -494,4 +498,30 @@ func (ledger *Ledger) verifyIncoming(ch string, fn string) error {
 	}
 
 	return nil
+}
+
+func generateEd25519Keys(t *testing.T) (ed25519.PublicKey, ed25519.PrivateKey) {
+	pKey, sKey, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	return pKey, sKey
+}
+
+func generateGOSTKeys(t *testing.T) (*gost3410.PublicKey, *gost3410.PrivateKey) {
+	sKeyGOST, err := gost3410.GenPrivateKey(
+		gost3410.CurveIdGostR34102001CryptoProXchAParamSet(),
+		gost3410.Mode2001,
+		rand.Reader,
+	)
+	require.NoError(t, err)
+
+	pKeyGOST, err := sKeyGOST.PublicKey()
+	require.NoError(t, err)
+
+	return pKeyGOST, sKeyGOST
+}
+
+func generateECDSAKeys(t *testing.T) (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
+	sKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	return &sKey.PublicKey, sKey
 }
