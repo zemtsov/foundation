@@ -449,6 +449,11 @@ func (bc *BaseContract) AllowedIndustrialBalanceSub(
 	return nil
 }
 
+func (bc *BaseContract) AllowedBalanceGetLocked(token string, address *types.Address) (*big.Int, error) {
+	balanceValue, err := balance.Get(bc.stub, balance.BalanceTypeAllowedLocked, address.String(), token)
+	return new(big.Int).SetBytes(balanceValue.Bytes()), err
+}
+
 func (bc *BaseContract) AllowedBalanceLock(
 	token string,
 	address *types.Address,
