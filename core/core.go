@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/anoideaopen/foundation/core/balance"
+	"github.com/anoideaopen/foundation/core/logger"
 	"github.com/anoideaopen/foundation/core/reflectx"
 	"github.com/anoideaopen/foundation/core/stringsx"
 	"github.com/anoideaopen/foundation/core/telemetry"
@@ -603,7 +604,7 @@ func (cc *ChainCode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 		)
 		if err != nil {
 			errMsg := fmt.Sprintf("failed to execute method %s: txID %s: %s", ExecuteTasks, stub.GetTxID(), err)
-			Logger().Error(errMsg)
+			logger.Logger().Error(errMsg)
 			span.SetStatus(codes.Error, errMsg)
 			return shim.Error(errMsg)
 		}
