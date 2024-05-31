@@ -163,7 +163,6 @@ func validateSignaturesInInvocation(
 				digestSHA3 = digestSHA3Raw[:]
 			}
 			valid = ed25519.Verify(publicKey, digestSHA3, signature)
-
 		}
 
 		if !valid {

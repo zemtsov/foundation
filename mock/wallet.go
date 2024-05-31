@@ -23,6 +23,7 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ddulesov/gogost/gost3410"
 	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
+	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ed25519"
@@ -102,12 +103,54 @@ type Wallet struct {
 	addrGOST  string
 }
 
+func getWalletKeyType(stub shim.ChaincodeStubInterface, address string) proto.KeyType {
+	ck, err := stub.CreateCompositeKey("pk_type", []string{address})
+	if err != nil {
+		panic(err)
+	}
+	raw, err := stub.GetState(ck)
+	if err != nil {
+		panic(err)
+	}
+	return proto.KeyType(proto.KeyType_value[string(raw)])
+}
+
+func (w *Wallet) saveKeyType() {
+	const (
+		stubACLName      = "acl"
+		compositeKeyType = "pk_type"
+	)
+	stubACL, ok := w.ledger.stubs[stubACLName]
+	if !ok {
+		panic("stub not found")
+	}
+	txID := fmt.Sprintf("%s_%s", w.addr, w.keyType.String())
+	stubACL.MockTransactionStart(txID)
+	address := w.addr
+	switch w.keyType {
+	case proto.KeyType_ecdsa:
+		address = w.addrECDSA
+	case proto.KeyType_gost:
+		address = w.addrGOST
+	}
+	compositeKey, err := stubACL.CreateCompositeKey(compositeKeyType, []string{address})
+	if err != nil {
+		panic(err)
+	}
+	if err = stubACL.PutState(compositeKey, []byte(w.keyType.String())); err != nil {
+		panic(err)
+	}
+	stubACL.MockTransactionEnd(txID)
+}
+
 func (w *Wallet) UseECDSAKey() {
 	w.keyType = proto.KeyType_ecdsa
+	w.saveKeyType()
 }
 
 func (w *Wallet) UseGOSTKey() {
 	w.keyType = proto.KeyType_gost
+	w.saveKeyType()
 }
 
 // ChangeKeys change private key, then public key will be derived and changed too
