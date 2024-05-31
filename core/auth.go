@@ -28,6 +28,7 @@ type invocationDetails struct {
 	nonceStringArg   string
 	signatureArgs    []string
 	signersCount     int
+	keyTypes         []pb.KeyType
 }
 
 // validateAndExtractInvocationContext verifies authorization and extracts the context of the chincode method call.
@@ -77,6 +78,20 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 		return nil, nil, 0, err
 	}
 
+	oldBehavior := invocation.signersCount != len(acl.GetKeyTypes())
+	invocation.keyTypes = make([]pb.KeyType, len(signers))
+	for i := 0; i < invocation.signersCount; i++ {
+		if oldBehavior {
+			if len(signers[i]) == int(gost3410.Mode2012) {
+				invocation.keyTypes[i] = pb.KeyType_gost
+			} else {
+				invocation.keyTypes[i] = pb.KeyType_ed25519
+			}
+		} else {
+			invocation.keyTypes[i] = acl.GetKeyTypes()[i]
+		}
+	}
+
 	// Form a message to verify the signature.
 	message := []byte(fn + strings.Join(args[:len(args)-invocation.signersCount], ""))
 
@@ -121,16 +136,8 @@ func validateSignaturesInInvocation(
 
 		// Verify the signature ED25519, ECDSA or GOST 34.10 2012
 		valid := false
-		if len(publicKey) == ed25519.PublicKeySize {
-			if digestSHA3 == nil {
-				digestSHA3Raw := sha3.Sum256(message)
-				digestSHA3 = digestSHA3Raw[:]
-			}
-			valid = ed25519.Verify(publicKey, digestSHA3, signature)
-		}
-
-		const KeyLengthECDSA = 64
-		if !valid && len(publicKey) == KeyLengthECDSA {
+		switch invocation.keyTypes[i] {
+		case pb.KeyType_ecdsa:
 			if digestSHA3 == nil {
 				digestSHA3Raw := sha3.Sum256(message)
 				digestSHA3 = digestSHA3Raw[:]
@@ -141,9 +148,7 @@ func validateSignaturesInInvocation(
 				Y:     new(big.Int).SetBytes(publicKey[32:]),
 			}
 			valid = ecdsa.VerifyASN1(ecdsaKey, digestSHA3, signature)
-		}
-
-		if !valid && len(publicKey) == int(gost3410.Mode2012) {
+		case pb.KeyType_gost:
 			if digestGOST == nil {
 				digestGOSTRaw := gost.Sum256(message)
 				digestGOST = digestGOSTRaw[:]
@@ -152,6 +157,13 @@ func validateSignaturesInInvocation(
 			if err != nil {
 				return fmt.Errorf("incorrect signature: %w", err)
 			}
+		default:
+			if digestSHA3 == nil {
+				digestSHA3Raw := sha3.Sum256(message)
+				digestSHA3 = digestSHA3Raw[:]
+			}
+			valid = ed25519.Verify(publicKey, digestSHA3, signature)
+
 		}
 
 		if !valid {

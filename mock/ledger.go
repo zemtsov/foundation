@@ -248,7 +248,7 @@ func (ledger *Ledger) NewWallet() *Wallet {
 	)
 	return &Wallet{
 		ledger:    ledger,
-		keyType:   KeyTypeEd25519,
+		keyType:   proto.KeyType_ed25519,
 		sKey:      sKey,
 		pKey:      pKey,
 		sKeyECDSA: sKeyECDSA,
@@ -294,7 +294,7 @@ func (ledger *Ledger) NewWalletFromKey(key string) *Wallet {
 	hash := sha3.Sum256(pub)
 	return &Wallet{
 		ledger:  ledger,
-		keyType: KeyTypeEd25519,
+		keyType: proto.KeyType_ed25519,
 		sKey:    sKey,
 		pKey:    pub,
 		addr:    base58.CheckEncode(hash[1:], hash[0]),
@@ -311,7 +311,7 @@ func (ledger *Ledger) NewWalletFromHexKey(key string) *Wallet {
 	hash := sha3.Sum256(pub)
 	return &Wallet{
 		ledger:  ledger,
-		keyType: KeyTypeEd25519,
+		keyType: proto.KeyType_ed25519,
 		sKey:    sKey,
 		pKey:    pub,
 		addr:    base58.CheckEncode(hash[1:], hash[0]),

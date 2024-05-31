@@ -81,19 +81,11 @@ const (
 	shouldNotBeHereMsg = "shouldn't be here"
 )
 
-const (
-	KeyTypeEd25519 = iota
-	KeyTypeGOST
-	KeyTypeECDSA
-)
-
-type KeyType int
-
 // Wallet is a wallet
 type Wallet struct {
 	ledger *Ledger
 
-	keyType KeyType
+	keyType proto.KeyType
 
 	pKey ed25519.PublicKey
 	sKey ed25519.PrivateKey
@@ -111,11 +103,11 @@ type Wallet struct {
 }
 
 func (w *Wallet) UseECDSAKey() {
-	w.keyType = KeyTypeECDSA
+	w.keyType = proto.KeyType_ecdsa
 }
 
 func (w *Wallet) UseGOSTKey() {
-	w.keyType = KeyTypeGOST
+	w.keyType = proto.KeyType_gost
 }
 
 // ChangeKeys change private key, then public key will be derived and changed too
@@ -132,9 +124,9 @@ func (w *Wallet) ChangeKeys(sKey ed25519.PrivateKey) error {
 // Address returns the address of the wallet
 func (w *Wallet) Address() string {
 	switch w.keyType {
-	case KeyTypeGOST:
+	case proto.KeyType_gost:
 		return w.addrGOST
-	case KeyTypeECDSA:
+	case proto.KeyType_ecdsa:
 		return w.addrECDSA
 	default:
 		return w.addr
@@ -340,9 +332,9 @@ func (w *Wallet) BatchedInvoke(ch, fn string, args ...string) (string, TxRespons
 
 func (w *Wallet) publicKeyBytes() []byte {
 	switch w.keyType {
-	case KeyTypeGOST:
+	case proto.KeyType_gost:
 		return w.pKeyGOST.Raw()
-	case KeyTypeECDSA:
+	case proto.KeyType_ecdsa:
 		return append(w.pKeyECDSA.X.Bytes(), w.pKeyECDSA.Y.Bytes()...)
 	default:
 		return w.pKey
@@ -374,7 +366,7 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 	)
 
 	switch w.keyType {
-	case KeyTypeGOST:
+	case proto.KeyType_gost:
 		digestRawGOST := gost.Sum256(message)
 		// Reverse the bytes for compatibility with client-side HSM.
 
@@ -383,7 +375,7 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 
 		signature, _ = w.sKeyGOST.SignDigest(digest, rand.Reader)
 		signature = reverseBytes(signature)
-	case KeyTypeECDSA:
+	case proto.KeyType_ecdsa:
 		digestRawSHA3 := sha3.Sum256(message)
 		digest = digestRawSHA3[:]
 		signature, err = ecdsa.SignASN1(rand.Reader, w.sKeyECDSA, digest)
