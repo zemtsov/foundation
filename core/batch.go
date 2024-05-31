@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/anoideaopen/foundation/core/cachestub"
+	"github.com/anoideaopen/foundation/core/contract"
 	"github.com/anoideaopen/foundation/core/logger"
 	"github.com/anoideaopen/foundation/core/multiswap"
-	"github.com/anoideaopen/foundation/core/reflectx"
 	"github.com/anoideaopen/foundation/core/swap"
 	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/core/types"
@@ -27,11 +27,10 @@ import (
 
 const robotSideTimeout = 300 // 5 minutes
 
-func (cc *ChainCode) saveToBatch(
+func (cc *Chaincode) saveToBatch(
 	traceCtx telemetry.TraceContext,
 	stub shim.ChaincodeStubInterface,
-	funcName string,
-	fn *Method,
+	method contract.Method,
 	sender *proto.Address,
 	args []string,
 	nonce uint64,
@@ -39,12 +38,8 @@ func (cc *ChainCode) saveToBatch(
 	log := logger.Logger()
 	txID := stub.GetTxID()
 
-	argsToValidate := args
-	if fn.needsAuth {
-		argsToValidate = append([]string{sender.AddrString()}, args...)
-	}
-
-	if err := reflectx.ValidateArguments(cc.contract, fn.Name, stub, argsToValidate...); err != nil {
+	err := cc.Router().Check(method.MethodName, cc.PrependSender(method, sender, args)...)
+	if err != nil {
 		return err
 	}
 
@@ -61,7 +56,7 @@ func (cc *ChainCode) saveToBatch(
 	}
 
 	pending := &proto.PendingTx{
-		Method:    funcName,
+		Method:    method.ChaincodeFunc,
 		Sender:    sender,
 		Args:      args,
 		Timestamp: txTimestamp.GetSeconds(),
@@ -94,7 +89,7 @@ func (cc *ChainCode) saveToBatch(
 	return stub.PutState(key, data)
 }
 
-func (cc *ChainCode) loadFromBatch(
+func (cc *Chaincode) loadFromBatch(
 	stub shim.ChaincodeStubInterface,
 	txID string,
 ) (*proto.PendingTx, string, error) {
@@ -133,7 +128,7 @@ func (cc *ChainCode) loadFromBatch(
 		return pending, key, fmt.Errorf("unknown method %s in tx %s", pending.GetMethod(), txID)
 	}
 
-	if !method.needsAuth {
+	if !method.RequiresAuth {
 		return pending, key, nil
 	}
 
@@ -152,7 +147,7 @@ func (cc *ChainCode) loadFromBatch(
 }
 
 //nolint:funlen
-func (cc *ChainCode) batchExecute(
+func (cc *Chaincode) batchExecute(
 	traceCtx telemetry.TraceContext,
 	stub shim.ChaincodeStubInterface,
 	dataIn string,
@@ -250,7 +245,7 @@ type TxResponse struct {
 	Accounting []*proto.AccountingRecord `json:"accounting"`
 }
 
-func (cc *ChainCode) batchedTxExecute(
+func (cc *Chaincode) batchedTxExecute(
 	traceCtx telemetry.TraceContext,
 	stub *cachestub.BatchCacheStub,
 	binaryTxID []byte,
@@ -342,7 +337,7 @@ func (cc *ChainCode) batchedTxExecute(
 	}
 
 	span.AddEvent("calling method")
-	response, err := cc.callMethod(traceCtx, txStub, method, pending.GetSender(), pending.GetArgs(), cfgBytes)
+	response, err := cc.InvokeContractMethod(traceCtx, txStub, method, pending.GetSender(), pending.GetArgs(), cfgBytes)
 	if err != nil {
 		_ = stub.ChaincodeStubInterface.DelState(key)
 		ee := proto.ResponseError{Error: err.Error()}
