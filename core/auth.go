@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/anoideaopen/foundation/core/contract"
 	"github.com/anoideaopen/foundation/core/gost"
 	"github.com/anoideaopen/foundation/core/helpers"
 	"github.com/anoideaopen/foundation/core/types"
@@ -45,18 +46,17 @@ type invocationDetails struct {
 //
 // Return values:
 //   - User address, method call arguments, nonce and error, if any.
-func (cc *ChainCode) validateAndExtractInvocationContext(
+func (cc *Chaincode) validateAndExtractInvocationContext(
 	stub shim.ChaincodeStubInterface,
-	fnMetadata *Method,
-	fn string,
+	method contract.Method,
 	args []string,
 ) (sender *pb.Address, invocationArgs []string, nonce uint64, err error) {
 	// If authorization is not required, return the arguments unchanged.
-	if !fnMetadata.needsAuth {
+	if !method.RequiresAuth {
 		return nil, args, 0, nil
 	}
 
-	invocation, err := parseInvocationDetails(fnMetadata, args)
+	invocation, err := parseInvocationDetails(method, args)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -93,7 +93,7 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 	}
 
 	// Form a message to verify the signature.
-	message := []byte(fn + strings.Join(args[:len(args)-invocation.signersCount], ""))
+	message := []byte(method.ChaincodeFunc + strings.Join(args[:len(args)-invocation.signersCount], ""))
 
 	if err = validateSignaturesInInvocation(invocation, message); err != nil {
 		return nil, nil, 0, err
@@ -111,7 +111,7 @@ func (cc *ChainCode) validateAndExtractInvocationContext(
 	}
 
 	// Return the signer's address, method arguments, and nonce.
-	return acl.GetAddress().GetAddress(), args[3 : 3+fnMetadata.in], nonce, nil
+	return acl.GetAddress().GetAddress(), args[3 : 3+(method.NumArgs-1)], nonce, nil
 }
 
 func validateSignaturesInInvocation(
@@ -192,13 +192,13 @@ func checkACLSignerStatus(stub shim.ChaincodeStubInterface, signers []string) (*
 }
 
 func parseInvocationDetails(
-	fnMetadata *Method,
+	method contract.Method,
 	args []string,
 ) (*invocationDetails, error) {
 	// Calculating the positions of arguments in an array.
 	var (
-		expectedArgsCount = fnMetadata.in + 4 // +4 for reqId, cc, ch, nonce
-		authArgsStartPos  = expectedArgsCount // Authorization arguments start position
+		expectedArgsCount = (method.NumArgs - 1) + 4 // +4 for reqId, cc, ch, nonce
+		authArgsStartPos  = expectedArgsCount        // Authorization arguments start position
 	)
 
 	// We check that the number of arguments is not less than expected.

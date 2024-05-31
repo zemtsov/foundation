@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	mathbig "math/big"
+	"strings"
 
 	"github.com/anoideaopen/foundation/core/balance"
 	"github.com/anoideaopen/foundation/core/cachestub"
 	"github.com/anoideaopen/foundation/core/swap"
-	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/proto"
@@ -28,22 +28,14 @@ const (
 //
 // Returns a shim.Success response if the swap done logic executes successfully.
 // Otherwise, it returns a shim.Error response.
-func (cc *ChainCode) swapDoneHandler(
-	traceCtx telemetry.TraceContext,
-	stub shim.ChaincodeStubInterface,
+func (cc *Chaincode) swapDoneHandler(
 	args []string,
-	cfgBytes []byte,
 ) peer.Response {
 	if cc.contract.ContractConfig().GetOptions().GetDisableSwaps() {
 		return shim.Error("handling swap done failed, " + ErrSwapDisabled.Error())
 	}
 
-	contract, ok := copyContractWithConfig(traceCtx, cc.contract, stub, cfgBytes).(BaseContractInterface)
-	if !ok {
-		return shim.Error("unsupported contract type")
-	}
-
-	return swap.UserDone(contract, args[0], args[1])
+	return swap.UserDone(cc.contract, args[0], args[1])
 }
 
 // QuerySwapGet returns swap by id
@@ -140,7 +132,7 @@ func (bc *BaseContract) TxSwapCancel(_ *types.Sender, swapID string) error { // 
 			return err
 		}
 	case bytes.Equal(s.GetCreator(), []byte("0000")) && s.TokenSymbol() == s.GetTo():
-		if err = balance.Add(bc.GetStub(), balance.BalanceTypeGiven, s.GetFrom(), "", new(mathbig.Int).SetBytes(s.GetAmount())); err != nil {
+		if err = balance.Add(bc.GetStub(), balance.BalanceTypeGiven, strings.ToUpper(s.GetFrom()), "", new(mathbig.Int).SetBytes(s.GetAmount())); err != nil {
 			return err
 		}
 	}

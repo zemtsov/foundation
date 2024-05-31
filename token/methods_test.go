@@ -101,8 +101,9 @@ func TestMetadataMethods(t *testing.T) {
 	err := json.Unmarshal([]byte(rsp), &meta)
 	require.NoError(t, err)
 
-	var tokenMethods = []string{"addDocs", "allowedBalanceOf", "allowedIndustrialBalanceTransfer",
-		"balanceOf", "buildInfo", "buyBack", "buyToken", "cancelCCTransferFrom",
+	var tokenMethods = []string{"addDocs", "allowedBalanceOf", "lockedAllowedBalanceOf",
+		"allowedIndustrialBalanceTransfer",
+		"balanceOf", "lockedBalanceOf", "buildInfo", "buyBack", "buyToken", "cancelCCTransferFrom",
 		"channelTransferByAdmin", "channelTransferByCustomer", "channelTransferFrom",
 		"channelTransferTo", "channelTransfersFrom", "commitCCTransferFrom", "coreChaincodeIDName",
 		"createCCTransferTo", "deleteCCTransferFrom", "deleteCCTransferTo", "deleteDoc",
