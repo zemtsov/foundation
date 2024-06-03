@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
@@ -22,6 +23,7 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ddulesov/gogost/gost3410"
 	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
+	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ed25519"
@@ -84,20 +86,71 @@ const (
 type Wallet struct {
 	ledger *Ledger
 
+	keyType proto.KeyType
+
 	pKey ed25519.PublicKey
 	sKey ed25519.PrivateKey
 
-	// Additional GOST Keys.
-	primaryGOST bool
-	pKeyGOST    *gost3410.PublicKey
-	sKeyGOST    *gost3410.PrivateKey
+	pKeyECDSA *ecdsa.PublicKey
+	sKeyECDSA *ecdsa.PrivateKey
 
-	addr     string
-	addrGOST string
+	// Additional GOST Keys.
+	pKeyGOST *gost3410.PublicKey
+	sKeyGOST *gost3410.PrivateKey
+
+	addr      string
+	addrECDSA string
+	addrGOST  string
 }
 
-func (w *Wallet) SetGOSTPrimary(primary bool) {
-	w.primaryGOST = primary
+func getWalletKeyType(stub shim.ChaincodeStubInterface, address string) proto.KeyType {
+	ck, err := stub.CreateCompositeKey("pk_type", []string{address})
+	if err != nil {
+		panic(err)
+	}
+	raw, err := stub.GetState(ck)
+	if err != nil {
+		panic(err)
+	}
+	return proto.KeyType(proto.KeyType_value[string(raw)])
+}
+
+func (w *Wallet) saveKeyType() {
+	const (
+		stubACLName      = "acl"
+		compositeKeyType = "pk_type"
+	)
+	stubACL, ok := w.ledger.stubs[stubACLName]
+	if !ok {
+		panic("stub not found")
+	}
+	txID := fmt.Sprintf("%s_%s", w.addr, w.keyType.String())
+	stubACL.MockTransactionStart(txID)
+	address := w.addr
+	switch w.keyType {
+	case proto.KeyType_ecdsa:
+		address = w.addrECDSA
+	case proto.KeyType_gost:
+		address = w.addrGOST
+	}
+	compositeKey, err := stubACL.CreateCompositeKey(compositeKeyType, []string{address})
+	if err != nil {
+		panic(err)
+	}
+	if err = stubACL.PutState(compositeKey, []byte(w.keyType.String())); err != nil {
+		panic(err)
+	}
+	stubACL.MockTransactionEnd(txID)
+}
+
+func (w *Wallet) UseECDSAKey() {
+	w.keyType = proto.KeyType_ecdsa
+	w.saveKeyType()
+}
+
+func (w *Wallet) UseGOSTKey() {
+	w.keyType = proto.KeyType_gost
+	w.saveKeyType()
 }
 
 // ChangeKeys change private key, then public key will be derived and changed too
@@ -113,11 +166,14 @@ func (w *Wallet) ChangeKeys(sKey ed25519.PrivateKey) error {
 
 // Address returns the address of the wallet
 func (w *Wallet) Address() string {
-	return w.addr
-}
-
-func (w *Wallet) AddressGOST() string {
-	return w.addrGOST
+	switch w.keyType {
+	case proto.KeyType_gost:
+		return w.addrGOST
+	case proto.KeyType_ecdsa:
+		return w.addrECDSA
+	default:
+		return w.addr
+	}
 }
 
 // PubKey returns the public key of the wallet
@@ -317,6 +373,17 @@ func (w *Wallet) BatchedInvoke(ch, fn string, args ...string) (string, TxRespons
 	return txID, TxResponse{}
 }
 
+func (w *Wallet) publicKeyBytes() []byte {
+	switch w.keyType {
+	case proto.KeyType_gost:
+		return w.pKeyGOST.Raw()
+	case proto.KeyType_ecdsa:
+		return append(w.pKeyECDSA.X.Bytes(), w.pKeyECDSA.Y.Bytes()...)
+	default:
+		return w.pKey
+	}
+}
+
 func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 	// Artificial delay to update the nonce value.
 	time.Sleep(time.Millisecond * 5)
@@ -326,12 +393,7 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 
 	// Forming a message for signature, including function name,
 	// empty string (placeholder), channel name, arguments and nonce.
-	var publicKey []byte
-	if !w.primaryGOST {
-		publicKey = w.pKey
-	} else {
-		publicKey = w.pKeyGOST.Raw()
-	}
+	publicKey := w.publicKeyBytes()
 
 	messageChunks := []string{fn, "", ch, ch}
 	messageChunks = append(messageChunks, args...)                  // Adding call arguments.
@@ -343,12 +405,11 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 	var (
 		digest    []byte
 		signature []byte
+		err       error
 	)
-	if !w.primaryGOST {
-		digestRawSHA3 := sha3.Sum256(message)
-		digest = digestRawSHA3[:]
-		signature = ed25519.Sign(w.sKey, digest)
-	} else {
+
+	switch w.keyType {
+	case proto.KeyType_gost:
 		digestRawGOST := gost.Sum256(message)
 		// Reverse the bytes for compatibility with client-side HSM.
 
@@ -357,6 +418,15 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 
 		signature, _ = w.sKeyGOST.SignDigest(digest, rand.Reader)
 		signature = reverseBytes(signature)
+	case proto.KeyType_ecdsa:
+		digestRawSHA3 := sha3.Sum256(message)
+		digest = digestRawSHA3[:]
+		signature, err = ecdsa.SignASN1(rand.Reader, w.sKeyECDSA, digest)
+		require.NoError(w.ledger.t, err)
+	default:
+		digestRawSHA3 := sha3.Sum256(message)
+		digest = digestRawSHA3[:]
+		signature = ed25519.Sign(w.sKey, digest)
 	}
 
 	// We remove the function name from the message and add a caption.

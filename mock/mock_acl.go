@@ -51,6 +51,8 @@ func (ma *mockACL) Invoke(stub shim.ChaincodeStubInterface) peer.Response { //no
 		})
 
 		hashed := sha3.Sum256(bytes.Join(binPubKeys, []byte("")))
+		keyType := getWalletKeyType(stub, base58.CheckEncode(hashed[1:], hashed[0]))
+
 		data, err := proto.Marshal(&pb.AclResponse{
 			Account: &pb.AccountInfo{
 				KycHash:    "123",
@@ -61,6 +63,9 @@ func (ma *mockACL) Invoke(stub shim.ChaincodeStubInterface) peer.Response { //no
 				SignaturePolicy: &pb.SignaturePolicy{
 					N: 2, //nolint:gomnd
 				},
+			},
+			KeyTypes: []pb.KeyType{
+				keyType,
 			},
 		})
 		if err != nil {

@@ -1,8 +1,11 @@
 package core
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -26,6 +29,7 @@ type invocationDetails struct {
 	nonceStringArg   string
 	signatureArgs    []string
 	signersCount     int
+	keyTypes         []pb.KeyType
 }
 
 // validateAndExtractInvocationContext verifies authorization and extracts the context of the chincode method call.
@@ -52,7 +56,7 @@ func (cc *Chaincode) validateAndExtractInvocationContext(
 		return nil, args, 0, nil
 	}
 
-	invocationDetails, err := parseInvocationDetails(method, args)
+	invocation, err := parseInvocationDetails(method, args)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -60,13 +64,13 @@ func (cc *Chaincode) validateAndExtractInvocationContext(
 	// Check the correspondence between the name and the channel of the chancode.
 	if err = checkChaincodeAndChannelName(
 		stub,
-		invocationDetails.chaincodeNameArg,
-		invocationDetails.channelNameArg,
+		invocation.chaincodeNameArg,
+		invocation.channelNameArg,
 	); err != nil {
 		return nil, nil, 0, err
 	}
 
-	signers := invocationDetails.signatureArgs[:invocationDetails.signersCount]
+	signers := invocation.signatureArgs[:invocation.signersCount]
 
 	// Check the ACL (access control list).
 	acl, err := checkACLSignerStatus(stub, signers)
@@ -74,62 +78,25 @@ func (cc *Chaincode) validateAndExtractInvocationContext(
 		return nil, nil, 0, err
 	}
 
-	// Determine the number of signatures needed.
-	requiredSignatures := 1 // One signature is required by default.
-	if invocationDetails.signersCount > 1 {
-		if acl.GetAddress().GetSignaturePolicy() != nil {
-			requiredSignatures = int(acl.GetAddress().GetSignaturePolicy().GetN())
+	oldBehavior := invocation.signersCount != len(acl.GetKeyTypes())
+	invocation.keyTypes = make([]pb.KeyType, len(signers))
+	for i := 0; i < invocation.signersCount; i++ {
+		if oldBehavior {
+			if len(signers[i]) == int(gost3410.Mode2012) {
+				invocation.keyTypes[i] = pb.KeyType_gost
+			} else {
+				invocation.keyTypes[i] = pb.KeyType_ed25519
+			}
 		} else {
-			requiredSignatures = invocationDetails.signersCount // If there is no rule in the ACL, all signatures are required.
+			invocation.keyTypes[i] = acl.GetKeyTypes()[i]
 		}
 	}
 
 	// Form a message to verify the signature.
-	var (
-		message = []byte(method.ChaincodeFunc + strings.Join(args[:len(args)-invocationDetails.signersCount], ""))
+	message := []byte(method.ChaincodeFunc + strings.Join(args[:len(args)-invocation.signersCount], ""))
 
-		digestSHA3 []byte
-		digestGOST []byte
-	)
-
-	// Checking signatures.
-	for i := 0; i < invocationDetails.signersCount; i++ {
-		if invocationDetails.signatureArgs[i+invocationDetails.signersCount] == "" {
-			continue // Skip the blank signatures.
-		}
-
-		var (
-			publicKey = base58.Decode(invocationDetails.signatureArgs[i])
-			signature = base58.Decode(invocationDetails.signatureArgs[i+invocationDetails.signersCount])
-		)
-
-		// Depending on the key length we verify the signature ED25519 or GOST 34.10 2012
-		valid := false
-		switch len(publicKey) {
-		case ed25519.PublicKeySize:
-			if digestSHA3 == nil {
-				digestSHA3Raw := sha3.Sum256(message)
-				digestSHA3 = digestSHA3Raw[:]
-			}
-
-			valid = ed25519.Verify(publicKey, digestSHA3, signature)
-		case int(gost3410.Mode2012):
-			if digestGOST == nil {
-				digestGOSTRaw := gost.Sum256(message)
-				digestGOST = digestGOSTRaw[:]
-			}
-
-			valid, err = gost.Verify(publicKey, digestGOST, signature)
-			if err != nil {
-				return nil, nil, 0, fmt.Errorf("incorrect signature: %w", err)
-			}
-		}
-
-		if !valid {
-			return nil, nil, 0, errors.New("incorrect signature")
-		}
-
-		requiredSignatures--
+	if err = validateSignaturesInInvocation(invocation, message); err != nil {
+		return nil, nil, 0, err
 	}
 
 	// Update the address if it has changed.
@@ -138,13 +105,71 @@ func (cc *Chaincode) validateAndExtractInvocationContext(
 	}
 
 	// Convert nonce from a string to a number.
-	nonce, err = strconv.ParseUint(invocationDetails.nonceStringArg, 10, 64)
+	nonce, err = strconv.ParseUint(invocation.nonceStringArg, 10, 64)
 	if err != nil {
 		return nil, nil, 0, err
 	}
 
 	// Return the signer's address, method arguments, and nonce.
 	return acl.GetAddress().GetAddress(), args[3 : 3+(method.NumArgs-1)], nonce, nil
+}
+
+func validateSignaturesInInvocation(
+	invocation *invocationDetails,
+	message []byte,
+) error {
+	var (
+		digestSHA3 []byte
+		digestGOST []byte
+		err        error
+	)
+
+	for i := 0; i < invocation.signersCount; i++ {
+		if invocation.signatureArgs[i+invocation.signersCount] == "" {
+			continue // Skip the blank signatures.
+		}
+
+		var (
+			publicKey = base58.Decode(invocation.signatureArgs[i])
+			signature = base58.Decode(invocation.signatureArgs[i+invocation.signersCount])
+		)
+
+		// Verify the signature ED25519, ECDSA or GOST 34.10 2012
+		valid := false
+		switch invocation.keyTypes[i] {
+		case pb.KeyType_ecdsa:
+			if digestSHA3 == nil {
+				digestSHA3Raw := sha3.Sum256(message)
+				digestSHA3 = digestSHA3Raw[:]
+			}
+			ecdsaKey := &ecdsa.PublicKey{
+				Curve: elliptic.P256(),
+				X:     new(big.Int).SetBytes(publicKey[:32]),
+				Y:     new(big.Int).SetBytes(publicKey[32:]),
+			}
+			valid = ecdsa.VerifyASN1(ecdsaKey, digestSHA3, signature)
+		case pb.KeyType_gost:
+			if digestGOST == nil {
+				digestGOSTRaw := gost.Sum256(message)
+				digestGOST = digestGOSTRaw[:]
+			}
+			valid, err = gost.Verify(publicKey, digestGOST, signature)
+			if err != nil {
+				return fmt.Errorf("incorrect signature: %w", err)
+			}
+		default:
+			if digestSHA3 == nil {
+				digestSHA3Raw := sha3.Sum256(message)
+				digestSHA3 = digestSHA3Raw[:]
+			}
+			valid = ed25519.Verify(publicKey, digestSHA3, signature)
+		}
+
+		if !valid {
+			return errors.New("incorrect signature")
+		}
+	}
+	return nil
 }
 
 func checkACLSignerStatus(stub shim.ChaincodeStubInterface, signers []string) (*pb.AclResponse, error) {
