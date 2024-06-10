@@ -28,7 +28,12 @@ func DeployACL(network *nwo.Network, components *nwo.Components, peer *nwo.Peer,
 	By("Deploying chaincode acl")
 	aclCfg := &aclpb.ACLConfig{
 		AdminSKIEncoded: skiBackend,
-		Validators:      []string{publicKeyBase58},
+		Validators: []*aclpb.ACLValidator{
+			{
+				PublicKey: publicKeyBase58,
+				KeyType:   pb.KeyType_ed25519.String(),
+			},
+		},
 	}
 	cfgBytesACL, err := protojson.Marshal(aclCfg)
 	Expect(err).NotTo(HaveOccurred())
