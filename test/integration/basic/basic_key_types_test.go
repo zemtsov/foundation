@@ -1,4 +1,4 @@
-package general
+package basic
 
 import (
 	"encoding/json"
@@ -25,7 +25,7 @@ import (
 	ginkgomon "github.com/tedsuo/ifrit/ginkgomon_v2"
 )
 
-var _ = Describe("General foundation tests with different key types", func() {
+var _ = Describe("Basic foundation tests with different key types", func() {
 	var (
 		testDir          string
 		cli              *docker.Client
@@ -173,15 +173,7 @@ var _ = Describe("General foundation tests with different key types", func() {
 			feeAddressSetter = client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
 			Expect(feeAddressSetter.PrivateKeyBytes).NotTo(Equal(nil))
 
-			cmn.DeployACL(
-				network,
-				components,
-				peer,
-				testDir,
-				skiBackend,
-				admin.PublicKeyBase58,
-				pbfound.KeyType_secp256k1.String(),
-			)
+			cmn.DeployACL(network, components, peer, testDir, skiBackend, admin.PublicKeyBase58, admin.PublicKeyType)
 			cmn.DeployCC(network, components, peer, testDir, skiRobot, admin.AddressBase58Check)
 			cmn.DeployFiat(network, components, peer, testDir, skiRobot,
 				admin.AddressBase58Check, feeSetter.AddressBase58Check, feeAddressSetter.AddressBase58Check)
@@ -566,15 +558,3 @@ var _ = Describe("General foundation tests with different key types", func() {
 		})
 	})
 })
-
-type FeeTransferRequestDTO struct {
-	SenderAddress    string `json:"sender_address,omitempty"`
-	RecipientAddress string `json:"recipient_address,omitempty"`
-	Amount           string `json:"amount,omitempty"`
-}
-
-type FeeTransferResponseDTO struct {
-	FeeAddress string `json:"fee_address,omitempty"`
-	Amount     string `json:"amount,omitempty"`
-	Currency   string `json:"currency,omitempty"`
-}
