@@ -220,6 +220,7 @@ enum KeyType {
     ed25519 = 0;
     secp256k1 = 1;
     gost = 2;
+    ecdsa = 3;
 }
 
 message AclResponse {
