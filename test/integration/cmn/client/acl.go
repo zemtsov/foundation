@@ -15,30 +15,11 @@ import (
 	"github.com/onsi/gomega/gexec"
 )
 
-func AddUser(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer, user *UserFoundation) {
-	sess, err := network.PeerUserSession(peer, "User1", commands.ChaincodeInvoke{
-		ChannelID: cmn.ChannelAcl,
-		Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
-		Name:      cmn.ChannelAcl,
-		Ctor:      cmn.CtorFromSlice([]string{"addUser", user.PublicKeyBase58, "test", user.UserID, "true"}),
-		PeerAddresses: []string{
-			network.PeerAddress(network.Peer("Org1", "peer0"), nwo.ListenPort),
-			network.PeerAddress(network.Peer("Org2", "peer0"), nwo.ListenPort),
-		},
-		WaitForEvent: true,
-	})
-	Expect(err).NotTo(HaveOccurred())
-	Eventually(sess, network.EventuallyTimeout).Should(gexec.Exit(0))
-	Expect(sess.Err).To(gbytes.Say("Chaincode invoke successful. result: status:200"))
-
-	CheckUser(network, peer, user)
-}
-
-func AddUserWithSecp256k1Key(
+func AddUser(
 	network *nwo.Network,
 	peer *nwo.Peer,
 	orderer *nwo.Orderer,
-	user *UserFoundationWithSecp256k1Key,
+	user *UserFoundation,
 ) {
 	sess, err := network.PeerUserSession(peer, "User1", commands.ChaincodeInvoke{
 		ChannelID: cmn.ChannelAcl,
@@ -51,7 +32,7 @@ func AddUserWithSecp256k1Key(
 				"test",
 				user.UserID,
 				"true",
-				pb.KeyType_secp256k1.String(),
+				user.PublicKeyType,
 			},
 		),
 		PeerAddresses: []string{
@@ -64,7 +45,7 @@ func AddUserWithSecp256k1Key(
 	Eventually(sess, network.EventuallyTimeout).Should(gexec.Exit(0))
 	Expect(sess.Err).To(gbytes.Say("Chaincode invoke successful. result: status:200"))
 
-	CheckUser(network, peer, &user.UserFoundation)
+	CheckUser(network, peer, user)
 }
 
 func CheckUser(network *nwo.Network, peer *nwo.Peer, user *UserFoundation) {

@@ -1,4 +1,4 @@
-package key_types
+package general
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	pb "github.com/anoideaopen/foundation/proto"
+	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/test/integration/cmn"
 	"github.com/anoideaopen/foundation/test/integration/cmn/client"
 	"github.com/anoideaopen/foundation/test/integration/cmn/fabricnetwork"
@@ -25,7 +25,7 @@ import (
 	ginkgomon "github.com/tedsuo/ifrit/ginkgomon_v2"
 )
 
-var _ = Describe("Key types foundation Tests", func() {
+var _ = Describe("General foundation tests with different key types", func() {
 	var (
 		testDir          string
 		cli              *docker.Client
@@ -78,9 +78,9 @@ var _ = Describe("Key types foundation Tests", func() {
 			skiBackend       string
 			skiRobot         string
 			peer             *nwo.Peer
-			admin            *client.UserFoundationWithSecp256k1Key
+			admin            *client.UserFoundation
 			feeSetter        *client.UserFoundation
-			feeAddressSetter *client.UserFoundationWithSecp256k1Key
+			feeAddressSetter *client.UserFoundation
 		)
 		BeforeEach(func() {
 			By("start redis")
@@ -166,21 +166,21 @@ var _ = Describe("Key types foundation Tests", func() {
 			skiRobot, err = cmn.ReadSKI(pathToPrivateKeyRobot)
 			Expect(err).NotTo(HaveOccurred())
 
-			admin = client.NewUserFoundationWithSecp256k1Key()
-			Expect(admin.PrivateKey).NotTo(Equal(nil))
-			feeSetter = client.NewUserFoundation()
-			Expect(feeSetter.PrivateKey).NotTo(Equal(nil))
-			feeAddressSetter = client.NewUserFoundationWithSecp256k1Key()
-			Expect(feeAddressSetter.PrivateKey).NotTo(Equal(nil))
+			admin = client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+			Expect(admin.PrivateKeyBytes).NotTo(Equal(nil))
+			feeSetter = client.NewUserFoundation(pbfound.KeyType_ed25519.String())
+			Expect(feeSetter.PrivateKeyBytes).NotTo(Equal(nil))
+			feeAddressSetter = client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+			Expect(feeAddressSetter.PrivateKeyBytes).NotTo(Equal(nil))
 
-			cmn.DeployACLWithValidatorKeyType(
+			cmn.DeployACL(
 				network,
 				components,
 				peer,
 				testDir,
 				skiBackend,
 				admin.PublicKeyBase58,
-				pb.KeyType_secp256k1.String(),
+				pbfound.KeyType_secp256k1.String(),
 			)
 			cmn.DeployCC(network, components, peer, testDir, skiRobot, admin.AddressBase58Check)
 			cmn.DeployFiat(network, components, peer, testDir, skiRobot,
@@ -203,8 +203,8 @@ var _ = Describe("Key types foundation Tests", func() {
 		})
 
 		It("add user", func() {
-			user := client.NewUserFoundationWithSecp256k1Key()
-			client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], user)
+			user := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+			client.AddUser(network, peer, network.Orderers[0], user)
 		})
 
 		It("check metadata in chaincode", func() {
@@ -240,8 +240,8 @@ var _ = Describe("Key types foundation Tests", func() {
 		})
 
 		It("query test", func() {
-			user := client.NewUserFoundationWithSecp256k1Key()
-			client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], user)
+			user := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+			client.AddUser(network, peer, network.Orderers[0], user)
 
 			By("send a request that is similar to invoke")
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -267,22 +267,22 @@ var _ = Describe("Key types foundation Tests", func() {
 		Describe("transfer tests", func() {
 			var (
 				user1 *client.UserFoundation
-				user2 *client.UserFoundationWithSecp256k1Key
+				user2 *client.UserFoundation
 			)
 
 			BeforeEach(func() {
 				By("add admin to acl")
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], admin)
+				client.AddUser(network, peer, network.Orderers[0], admin)
 
 				By("create users")
-				user1 = client.NewUserFoundation()
-				user2 = client.NewUserFoundationWithSecp256k1Key()
+				user1 = client.NewUserFoundation(pbfound.KeyType_ed25519.String())
+				user2 = client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
 			})
 
 			It("transfer", func() {
 				By("add users to acl")
 				client.AddUser(network, peer, network.Orderers[0], user1)
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], user2)
+				client.AddUser(network, peer, network.Orderers[0], user2)
 
 				By("emit tokens")
 				amount := "1"
@@ -332,12 +332,12 @@ var _ = Describe("Key types foundation Tests", func() {
 				user2.UserID = "2222"
 
 				client.AddUser(network, peer, network.Orderers[0], user1)
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], user2)
+				client.AddUser(network, peer, network.Orderers[0], user2)
 				client.AddUser(network, peer, network.Orderers[0], feeSetter)
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], feeAddressSetter)
+				client.AddUser(network, peer, network.Orderers[0], feeAddressSetter)
 
-				feeWallet := client.NewUserFoundationWithSecp256k1Key()
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], feeWallet)
+				feeWallet := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+				client.AddUser(network, peer, network.Orderers[0], feeWallet)
 
 				By("emit tokens")
 				amount := "3"
@@ -410,12 +410,12 @@ var _ = Describe("Key types foundation Tests", func() {
 				user2.UserID = "1111"
 
 				client.AddUser(network, peer, network.Orderers[0], user1)
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], user2)
+				client.AddUser(network, peer, network.Orderers[0], user2)
 				client.AddUser(network, peer, network.Orderers[0], feeSetter)
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], feeAddressSetter)
+				client.AddUser(network, peer, network.Orderers[0], feeAddressSetter)
 
-				feeWallet := client.NewUserFoundationWithSecp256k1Key()
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], feeWallet)
+				feeWallet := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+				client.AddUser(network, peer, network.Orderers[0], feeWallet)
 
 				By("emit tokens")
 				amount := "3"
@@ -486,10 +486,10 @@ var _ = Describe("Key types foundation Tests", func() {
 				By("add users to acl")
 				client.AddUser(network, peer, network.Orderers[0], user1)
 				client.AddUser(network, peer, network.Orderers[0], feeSetter)
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], feeAddressSetter)
+				client.AddUser(network, peer, network.Orderers[0], feeAddressSetter)
 
-				feeWallet := client.NewUserFoundationWithSecp256k1Key()
-				client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], feeWallet)
+				feeWallet := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+				client.AddUser(network, peer, network.Orderers[0], feeWallet)
 
 				By("emit tokens")
 				amount := "3"
@@ -553,16 +553,16 @@ var _ = Describe("Key types foundation Tests", func() {
 
 		It("accessmatrix - add and remove rights", func() {
 			By("add user to acl")
-			user1 := client.NewUserFoundationWithSecp256k1Key()
-			client.AddUserWithSecp256k1Key(network, peer, network.Orderers[0], user1)
+			user1 := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+			client.AddUser(network, peer, network.Orderers[0], user1)
 
 			By("add rights and check rights")
 			client.AddRights(network, peer, network.Orderers[0],
-				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", &user1.UserFoundation)
+				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", user1)
 
 			By("remove rights and check rights")
 			client.RemoveRights(network, peer, network.Orderers[0],
-				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", &user1.UserFoundation)
+				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", user1)
 		})
 	})
 })
