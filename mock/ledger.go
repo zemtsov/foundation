@@ -3,7 +3,6 @@ package mock
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -26,6 +25,7 @@ import (
 	"github.com/anoideaopen/foundation/proto"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ddulesov/gogost/gost3410"
+	eth "github.com/ethereum/go-ethereum/crypto"
 	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
 	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-protos-go/peer"
@@ -239,25 +239,25 @@ func (l *Ledger) WaitChTransferTo(name string, id string, timeout time.Duration)
 // NewWallet creates new wallet
 func (l *Ledger) NewWallet() *Wallet {
 	var (
-		pKey, sKey           = generateEd25519Keys(l.t)
-		pKeyGOST, sKeyGOST   = generateGOSTKeys(l.t)
-		pKeyECDSA, sKeyECDSA = generateECDSAKeys(l.t)
-		hash                 = sha3.Sum256(pKey)
-		hashGOST             = sha3.Sum256(pKeyGOST.Raw())
-		hashECDSA            = sha3.Sum256(append(pKeyECDSA.X.Bytes(), pKeyECDSA.Y.Bytes()...))
+		pKey, sKey                   = generateEd25519Keys(l.t)
+		pKeyGOST, sKeyGOST           = generateGOSTKeys(l.t)
+		pKeySecp256k1, sKeySecp256k1 = generateSecp256k1Keys(l.t)
+		hash                         = sha3.Sum256(pKey)
+		hashGOST                     = sha3.Sum256(pKeyGOST.Raw())
+		hashSecp256k1                = sha3.Sum256(append(pKeySecp256k1.X.Bytes(), pKeySecp256k1.Y.Bytes()...))
 	)
 	return &Wallet{
-		ledger:    l,
-		keyType:   proto.KeyType_ed25519,
-		sKey:      sKey,
-		pKey:      pKey,
-		sKeyECDSA: sKeyECDSA,
-		pKeyECDSA: pKeyECDSA,
-		sKeyGOST:  sKeyGOST,
-		pKeyGOST:  pKeyGOST,
-		addr:      base58.CheckEncode(hash[1:], hash[0]),
-		addrGOST:  base58.CheckEncode(hashGOST[1:], hashGOST[0]),
-		addrECDSA: base58.CheckEncode(hashECDSA[1:], hashECDSA[0]),
+		ledger:        l,
+		keyType:       proto.KeyType_ed25519,
+		sKey:          sKey,
+		pKey:          pKey,
+		sKeySecp256k1: sKeySecp256k1,
+		pKeySecp256k1: pKeySecp256k1,
+		sKeyGOST:      sKeyGOST,
+		pKeyGOST:      pKeyGOST,
+		addr:          base58.CheckEncode(hash[1:], hash[0]),
+		addrGOST:      base58.CheckEncode(hashGOST[1:], hashGOST[0]),
+		addrSecp256k1: base58.CheckEncode(hashSecp256k1[1:], hashSecp256k1[0]),
 	}
 }
 
@@ -520,8 +520,8 @@ func generateGOSTKeys(t *testing.T) (*gost3410.PublicKey, *gost3410.PrivateKey) 
 	return pKeyGOST, sKeyGOST
 }
 
-func generateECDSAKeys(t *testing.T) (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
-	sKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+func generateSecp256k1Keys(t *testing.T) (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
+	sKey, err := ecdsa.GenerateKey(eth.S256(), rand.Reader)
 	require.NoError(t, err)
 	return &sKey.PublicKey, sKey
 }
