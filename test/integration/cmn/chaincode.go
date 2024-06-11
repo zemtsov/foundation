@@ -52,6 +52,42 @@ func DeployACL(network *nwo.Network, components *nwo.Components, peer *nwo.Peer,
 	Eventually(sess, network.EventuallyTimeout).Should(gbytes.Say(`{"Addrs":null,"Bookmark":""}`))
 }
 
+func DeployACLWithValidatorKeyType(
+	network *nwo.Network,
+	components *nwo.Components,
+	peer *nwo.Peer,
+	testDir string,
+	skiBackend string,
+	publicKeyBase58 string,
+	keyType string,
+) {
+	By("Deploying chaincode acl with validator's key type specified")
+	aclCfg := &aclpb.ACLConfig{
+		AdminSKIEncoded: skiBackend,
+		Validators: []*aclpb.ACLValidator{
+			{
+				PublicKey: publicKeyBase58,
+				KeyType:   keyType,
+			},
+		},
+	}
+	cfgBytesACL, err := protojson.Marshal(aclCfg)
+	Expect(err).NotTo(HaveOccurred())
+	ctorACL := CtorFromSlice([]string{string(cfgBytesACL)})
+	DeployChaincodeFoundation(network, ChannelAcl, components,
+		AclModulePath(), ctorACL, testDir)
+
+	By("querying the chaincode from acl")
+	sess, err := network.PeerUserSession(peer, "User1", commands.ChaincodeQuery{
+		ChannelID: ChannelAcl,
+		Name:      ChannelAcl,
+		Ctor:      CtorFromSlice([]string{"getAddresses", "10", ""}),
+	})
+	Expect(err).NotTo(HaveOccurred())
+	Eventually(sess, network.EventuallyTimeout).Should(gexec.Exit(0))
+	Eventually(sess, network.EventuallyTimeout).Should(gbytes.Say(`{"Addrs":null,"Bookmark":""}`))
+}
+
 func DeployCC(network *nwo.Network, components *nwo.Components, peer *nwo.Peer,
 	testDir string, skiRobot string, addressBase58Check string) {
 	By("Deploying chaincode cc")

@@ -65,7 +65,7 @@ func NBTxInvokeByRobot(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Ordere
 
 // NBTxInvokeWithSign func for invoke with sign to foundation fabric
 func NBTxInvokeWithSign(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer,
-	checkErr CheckResultFunc, channel string, ccName string, user *UserFoundation,
+	checkErr CheckResultFunc, channel string, ccName string, user Signer,
 	fn string, requestID string, nonce string, args ...string) {
 	ctorArgs := append(append([]string{fn, requestID, channel, ccName}, args...), nonce)
 	pubKey, sMsg, err := user.Sign(ctorArgs...)
@@ -228,7 +228,7 @@ func TxInvokeByRobot(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer,
 
 // TxInvokeWithSign func for invoke with sign to foundation fabric
 func TxInvokeWithSign(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer,
-	channel string, ccName string, user *UserFoundation,
+	channel string, ccName string, user Signer,
 	fn string, requestID string, nonce string, args ...string) (txId string) {
 	ctorArgs := append(append([]string{fn, requestID, channel, ccName}, args...), nonce)
 	pubKey, sMsg, err := user.Sign(ctorArgs...)

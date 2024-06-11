@@ -34,6 +34,39 @@ func AddUser(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer, user *U
 	CheckUser(network, peer, user)
 }
 
+func AddUserWithSecp256k1Key(
+	network *nwo.Network,
+	peer *nwo.Peer,
+	orderer *nwo.Orderer,
+	user *UserFoundationWithSecp256k1Key,
+) {
+	sess, err := network.PeerUserSession(peer, "User1", commands.ChaincodeInvoke{
+		ChannelID: cmn.ChannelAcl,
+		Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
+		Name:      cmn.ChannelAcl,
+		Ctor: cmn.CtorFromSlice(
+			[]string{
+				"addUserWithPublicKeyType",
+				user.PublicKeyBase58,
+				"test",
+				user.UserID,
+				"true",
+				pb.KeyType_secp256k1.String(),
+			},
+		),
+		PeerAddresses: []string{
+			network.PeerAddress(network.Peer("Org1", "peer0"), nwo.ListenPort),
+			network.PeerAddress(network.Peer("Org2", "peer0"), nwo.ListenPort),
+		},
+		WaitForEvent: true,
+	})
+	Expect(err).NotTo(HaveOccurred())
+	Eventually(sess, network.EventuallyTimeout).Should(gexec.Exit(0))
+	Expect(sess.Err).To(gbytes.Say("Chaincode invoke successful. result: status:200"))
+
+	CheckUser(network, peer, &user.UserFoundation)
+}
+
 func CheckUser(network *nwo.Network, peer *nwo.Peer, user *UserFoundation) {
 	Eventually(func() string {
 		sess, err := network.PeerUserSession(peer, "User1", commands.ChaincodeQuery{

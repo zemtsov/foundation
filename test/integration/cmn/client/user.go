@@ -1,6 +1,7 @@
 package client
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
@@ -8,8 +9,13 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
+	eth "github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 )
+
+type Signer interface {
+	Sign(args ...string) (publicKeyBase58 string, signMsg []byte, err error)
+}
 
 type UserFoundation struct {
 	PrivateKey         ed25519.PrivateKey
@@ -17,6 +23,12 @@ type UserFoundation struct {
 	PublicKeyBase58    string
 	AddressBase58Check string
 	UserID             string
+}
+
+type UserFoundationWithSecp256k1Key struct {
+	UserFoundation
+	PrivateKey *ecdsa.PrivateKey
+	PublicKey  *ecdsa.PublicKey
 }
 
 func NewUserFoundation() *UserFoundation {
@@ -56,6 +68,28 @@ func UserFoundationFromPrivateKey(privateKey ed25519.PrivateKey) (*UserFoundatio
 	}, nil
 }
 
+func NewUserFoundationWithSecp256k1Key() *UserFoundationWithSecp256k1Key {
+	privateKey, err := ecdsa.GenerateKey(eth.S256(), rand.Reader)
+	if err != nil {
+		return &UserFoundationWithSecp256k1Key{}
+	}
+	publicKey := privateKey.PublicKey
+	publicKeyBytes := append(publicKey.X.Bytes(), publicKey.Y.Bytes()...)
+	publicKeyBase58 := base58.Encode(publicKeyBytes)
+	hash := sha3.Sum256(publicKeyBytes)
+	addressBase58Check := base58.CheckEncode(hash[1:], hash[0])
+
+	return &UserFoundationWithSecp256k1Key{
+		UserFoundation: UserFoundation{
+			PublicKeyBase58:    publicKeyBase58,
+			AddressBase58Check: addressBase58Check,
+			UserID:             "testuser",
+		},
+		PrivateKey: privateKey,
+		PublicKey:  &publicKey,
+	}
+}
+
 func UserFoundationFromBase58CheckPrivateKey(base58Check string) (*UserFoundation, error) {
 	decode, ver, err := base58.CheckDecode(base58Check)
 	if err != nil {
@@ -78,6 +112,28 @@ func (u *UserFoundation) Sign(args ...string) (publicKeyBase58 string, signMsg [
 	err = verifyEd25519(u.PublicKey, bytesToSign[:], signMsg)
 	if err != nil {
 		return "", nil, err
+	}
+
+	return
+}
+
+func (u *UserFoundationWithSecp256k1Key) Sign(
+	args ...string,
+) (publicKeyBase58 string, signMsg []byte, err error) {
+	publicKeyBase58 = u.PublicKeyBase58
+	msg := make([]string, 0, len(args)+1)
+	msg = append(msg, args...)
+	msg = append(msg, publicKeyBase58)
+
+	bytesToSign := sha3.Sum256([]byte(strings.Join(msg, "")))
+
+	signMsg, err = ecdsa.SignASN1(rand.Reader, u.PrivateKey, bytesToSign[:])
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !ecdsa.VerifyASN1(u.PublicKey, bytesToSign[:], signMsg) {
+		return "", nil, errors.New("valid signature rejected")
 	}
 
 	return

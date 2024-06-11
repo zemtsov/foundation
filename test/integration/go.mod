@@ -4,11 +4,12 @@ go 1.22.4
 
 require (
 	github.com/IBM/idemix v0.0.2-0.20231011101252-a4feda90f3f7
-	github.com/anoideaopen/acl v0.0.0-20240607204953-f8b676b2225f
+	github.com/anoideaopen/acl v0.0.0-20240611152007-f9214ce6eae8
 	github.com/anoideaopen/channel-transfer v0.0.2-0.20240605150922-e13f00983d0b
-	github.com/anoideaopen/foundation v0.0.2-0.20240603112837-d0830e597d52
+	github.com/anoideaopen/foundation v0.0.2-0.20240611130553-67a5dbb1fa4f
 	github.com/anoideaopen/robot v0.0.2-0.20240605153321-0e09032227bf
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
+	github.com/ethereum/go-ethereum v1.13.15
 	github.com/fsouza/go-dockerclient v1.10.0
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/golang/protobuf v1.5.3
@@ -58,7 +59,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
-	github.com/ethereum/go-ethereum v1.13.15 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/flowchartsman/swaggerui v0.0.0-20221017034628-909ed4f3701b // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
