@@ -95,7 +95,7 @@ func UserFoundationFromBase58CheckPrivateKey(base58Check string) (*UserFoundatio
 	return UserFoundationFromPrivateKey(privateKey)
 }
 
-func (u *UserFoundation) SignArguments(args ...string) (publicKeyBase58 string, signMsg []byte, err error) {
+func (u *UserFoundation) Sign(args ...string) (publicKeyBase58 string, signMsg []byte, err error) {
 	publicKeyBase58 = u.PublicKeyBase58
 	msg := make([]string, 0, len(args)+1)
 	msg = append(msg, args...)
@@ -103,14 +103,14 @@ func (u *UserFoundation) SignArguments(args ...string) (publicKeyBase58 string, 
 
 	bytesToSign := sha3.Sum256([]byte(strings.Join(msg, "")))
 
-	if signMsg, err = u.Sign(bytesToSign[:]); err != nil {
+	if signMsg, err = u.sign(bytesToSign[:]); err != nil {
 		return "", nil, err
 	}
 
 	return
 }
 
-func (u *UserFoundation) Sign(message []byte) (signMsg []byte, err error) {
+func (u *UserFoundation) sign(message []byte) (signMsg []byte, err error) {
 	switch u.PublicKeyType {
 	case pbfound.KeyType_ed25519.String():
 		signMsg = signMessageEd25519(u.PrivateKeyBytes, message)
@@ -139,8 +139,8 @@ func (u *UserFoundation) SetUserID(id string) {
 	}
 }
 
-// MultiSig - added multi sign
-func MultiSig(args []string, users ...*UserFoundation) (publicKeysBase58 []string, signMsgs [][]byte, err error) {
+// MultiSign - added multi sign
+func MultiSign(args []string, users ...*UserFoundation) (publicKeysBase58 []string, signMsgs [][]byte, err error) {
 	msg := make([]string, 0, len(args)+len(users))
 	msg = append(msg, args...)
 	for _, i := range users {
@@ -152,7 +152,7 @@ func MultiSig(args []string, users ...*UserFoundation) (publicKeysBase58 []strin
 
 	for _, i := range users {
 		var sMsg []byte
-		if sMsg, err = i.Sign(bytesToSign[:]); err != nil {
+		if sMsg, err = i.sign(bytesToSign[:]); err != nil {
 			return nil, nil, err
 		}
 		signMsgs = append(signMsgs, sMsg)

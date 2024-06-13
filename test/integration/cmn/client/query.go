@@ -59,7 +59,7 @@ func QueryWithSign(network *nwo.Network, peer *nwo.Peer, channel string, ccName 
 	checkResultFunc CheckResultFunc, user *UserFoundation,
 	fn string, requestID string, nonce string, args ...string) {
 	ctorArgs := append(append([]string{fn, requestID, channel, ccName}, args...), nonce)
-	pubKey, sMsg, err := user.SignArguments(ctorArgs...)
+	pubKey, sMsg, err := user.Sign(ctorArgs...)
 	Expect(err).NotTo(HaveOccurred())
 
 	ctorArgs = append(ctorArgs, pubKey, base58.Encode(sMsg))

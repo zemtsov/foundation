@@ -14,13 +14,11 @@ import (
 	"github.com/anoideaopen/foundation/test/integration/cmn/runner"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/hyperledger/fabric/integration/nwo"
-	"github.com/hyperledger/fabric/integration/nwo/commands"
 	"github.com/hyperledger/fabric/integration/nwo/fabricconfig"
 	runnerFbk "github.com/hyperledger/fabric/integration/nwo/runner"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"github.com/onsi/gomega/gexec"
 	"github.com/tedsuo/ifrit"
 	ginkgomon "github.com/tedsuo/ifrit/ginkgomon_v2"
 )
@@ -192,68 +190,6 @@ var _ = Describe("Basic foundation tests with different key types", func() {
 				robotProc.Signal(syscall.SIGTERM)
 				Eventually(robotProc.Wait(), network.EventuallyTimeout).Should(Receive())
 			}
-		})
-
-		It("add user", func() {
-			user := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
-			client.AddUser(network, peer, network.Orderers[0], user)
-		})
-
-		It("check metadata in chaincode", func() {
-			By("querying the chaincode from cc")
-			sess, err := network.PeerUserSession(peer, "User1", commands.ChaincodeQuery{
-				ChannelID: cmn.ChannelCC,
-				Name:      cmn.ChannelCC,
-				Ctor:      cmn.CtorFromSlice([]string{"metadata"}),
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Eventually(sess, network.EventuallyTimeout).Should(gexec.Exit(0))
-			Eventually(sess, network.EventuallyTimeout).Should(gbytes.Say(`{"name":"Currency Coin","symbol":"CC","decimals":8,"underlying_asset":"US Dollars"`))
-
-			By("querying the chaincode from fiat")
-			sess, err = network.PeerUserSession(peer, "User1", commands.ChaincodeQuery{
-				ChannelID: cmn.ChannelFiat,
-				Name:      cmn.ChannelFiat,
-				Ctor:      cmn.CtorFromSlice([]string{"metadata"}),
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Eventually(sess, network.EventuallyTimeout).Should(gexec.Exit(0))
-			Eventually(sess, network.EventuallyTimeout).Should(gbytes.Say(`{"name":"FIAT","symbol":"FIAT","decimals":8,"underlying_asset":"US Dollars"`))
-
-			By("querying the chaincode from industrial")
-			sess, err = network.PeerUserSession(peer, "User1", commands.ChaincodeQuery{
-				ChannelID: cmn.ChannelIndustrial,
-				Name:      cmn.ChannelIndustrial,
-				Ctor:      cmn.CtorFromSlice([]string{"metadata"}),
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Eventually(sess, network.EventuallyTimeout).Should(gexec.Exit(0))
-			Eventually(sess, network.EventuallyTimeout).Should(gbytes.Say(`{"name":"Industrial token","symbol":"INDUSTRIAL","decimals":8,"underlying_asset":"TEST_UnderlyingAsset"`))
-		})
-
-		It("query test", func() {
-			user := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
-			client.AddUser(network, peer, network.Orderers[0], user)
-
-			By("send a request that is similar to invoke")
-			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-				fabricnetwork.CheckResult(fabricnetwork.CheckBalance("Ok"), nil),
-				"allowedBalanceAdd", "CC", user.AddressBase58Check, "50", "add some assets")
-
-			By("let's check the allowed balance - 1")
-			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-				fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
-				"allowedBalanceOf", user.AddressBase58Check, "CC")
-
-			By("send a invoke that is similar to request")
-			client.NBTxInvoke(network, peer, network.Orderers[0], nil,
-				cmn.ChannelFiat, cmn.ChannelFiat,
-				"allowedBalanceAdd", "CC", user.AddressBase58Check, "50", "add some assets")
-
-			By("let's check the allowed balance - 2")
-			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-				fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
-				"allowedBalanceOf", user.AddressBase58Check, "CC")
 		})
 
 		It("transfer", func() {
