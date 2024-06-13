@@ -23,15 +23,22 @@ const (
 	ChannelIndustrial = "industrial"
 )
 
-func DeployACL(network *nwo.Network, components *nwo.Components, peer *nwo.Peer,
-	testDir string, skiBackend string, publicKeyBase58 string) {
-	By("Deploying chaincode acl")
+func DeployACL(
+	network *nwo.Network,
+	components *nwo.Components,
+	peer *nwo.Peer,
+	testDir string,
+	skiBackend string,
+	publicKeyBase58 string,
+	validatorKeyType string,
+) {
+	By("Deploying chaincode acl with validator's key type specified")
 	aclCfg := &aclpb.ACLConfig{
 		AdminSKIEncoded: skiBackend,
 		Validators: []*aclpb.ACLValidator{
 			{
 				PublicKey: publicKeyBase58,
-				KeyType:   pb.KeyType_ed25519.String(),
+				KeyType:   validatorKeyType,
 			},
 		},
 	}
