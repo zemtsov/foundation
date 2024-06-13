@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -64,7 +65,37 @@ func NewUserFoundation(keyType string) *UserFoundation {
 	}
 }
 
-func (u *UserFoundation) Sign(args ...string) (publicKeyBase58 string, signMsg []byte, err error) {
+func UserFoundationFromPrivateKey(privateKey ed25519.PrivateKey) (*UserFoundation, error) {
+	publicKey, ok := privateKey.Public().(ed25519.PublicKey)
+	if !ok {
+		return nil, errors.New("type requireion failed")
+	}
+
+	publicKeyBase58 := base58.Encode(publicKey)
+	hash := sha3.Sum256(publicKey)
+	addressBase58Check := base58.CheckEncode(hash[1:], hash[0])
+
+	return &UserFoundation{
+		PrivateKeyBytes:    privateKey,
+		PublicKeyBytes:     publicKey,
+		PublicKeyBase58:    publicKeyBase58,
+		AddressBase58Check: addressBase58Check,
+		UserID:             "testuser",
+		PublicKeyType:      pbfound.KeyType_ed25519.String(),
+	}, nil
+}
+
+func UserFoundationFromBase58CheckPrivateKey(base58Check string) (*UserFoundation, error) {
+	decode, ver, err := base58.CheckDecode(base58Check)
+	if err != nil {
+		return nil, fmt.Errorf("check decode: %w", err)
+	}
+	privateKey := ed25519.PrivateKey(append([]byte{ver}, decode...))
+
+	return UserFoundationFromPrivateKey(privateKey)
+}
+
+func (u *UserFoundation) SignArguments(args ...string) (publicKeyBase58 string, signMsg []byte, err error) {
 	publicKeyBase58 = u.PublicKeyBase58
 	msg := make([]string, 0, len(args)+1)
 	msg = append(msg, args...)
@@ -72,23 +103,31 @@ func (u *UserFoundation) Sign(args ...string) (publicKeyBase58 string, signMsg [
 
 	bytesToSign := sha3.Sum256([]byte(strings.Join(msg, "")))
 
+	if signMsg, err = u.Sign(bytesToSign[:]); err != nil {
+		return "", nil, err
+	}
+
+	return
+}
+
+func (u *UserFoundation) Sign(message []byte) (signMsg []byte, err error) {
 	switch u.PublicKeyType {
 	case pbfound.KeyType_ed25519.String():
-		signMsg = signMessageEd25519(u.PrivateKeyBytes, bytesToSign[:])
-		err = verifyEd25519(u.PublicKeyBytes, bytesToSign[:], signMsg)
+		signMsg = signMessageEd25519(u.PrivateKeyBytes, message)
+		err = verifyEd25519(u.PublicKeyBytes, message, signMsg)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
 
 	case pbfound.KeyType_secp256k1.String():
-		signMsg = signMessageSecp256k1(u.PrivateKeyBytes, bytesToSign[:])
-		err = verifySecp256k1(u.PublicKeyBytes, bytesToSign[:], signMsg)
+		signMsg = signMessageSecp256k1(u.PrivateKeyBytes, message)
+		err = verifySecp256k1(u.PublicKeyBytes, message, signMsg)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
 
 	default:
-		return "", nil, errors.New("unknown key type")
+		return nil, errors.New("unknown key type")
 	}
 
 	return
@@ -100,9 +139,31 @@ func (u *UserFoundation) SetUserID(id string) {
 	}
 }
 
+// MultiSig - added multi sign
+func MultiSig(args []string, users ...*UserFoundation) (publicKeysBase58 []string, signMsgs [][]byte, err error) {
+	msg := make([]string, 0, len(args)+len(users))
+	msg = append(msg, args...)
+	for _, i := range users {
+		msg = append(msg, i.PublicKeyBase58)
+		publicKeysBase58 = append(publicKeysBase58, i.PublicKeyBase58)
+	}
+
+	bytesToSign := sha3.Sum256([]byte(strings.Join(msg, "")))
+
+	for _, i := range users {
+		var sMsg []byte
+		if sMsg, err = i.Sign(bytesToSign[:]); err != nil {
+			return nil, nil, err
+		}
+		signMsgs = append(signMsgs, sMsg)
+	}
+
+	return
+}
+
 // signMessageEd25519 - sign arguments with private key in ed25519
-func signMessageEd25519(privateKeyBytes []byte, msgToSign []byte) []byte {
-	sig := ed25519.Sign(privateKeyBytes, msgToSign)
+func signMessageEd25519(privateKey ed25519.PrivateKey, msgToSign []byte) []byte {
+	sig := ed25519.Sign(privateKey, msgToSign)
 	return sig
 }
 

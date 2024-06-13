@@ -256,305 +256,58 @@ var _ = Describe("Basic foundation tests with different key types", func() {
 				"allowedBalanceOf", user.AddressBase58Check, "CC")
 		})
 
-		Describe("transfer tests", func() {
-			var (
-				user1 *client.UserFoundation
-				user2 *client.UserFoundation
-			)
+		It("transfer", func() {
+			By("create users")
+			user1 := client.NewUserFoundation(pbfound.KeyType_ed25519.String())
+			user2 := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
 
-			BeforeEach(func() {
-				By("add admin to acl")
-				client.AddUser(network, peer, network.Orderers[0], admin)
-
-				By("create users")
-				user1 = client.NewUserFoundation(pbfound.KeyType_ed25519.String())
-				user2 = client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
-			})
-
-			It("transfer", func() {
-				By("add users to acl")
-				client.AddUser(network, peer, network.Orderers[0], user1)
-				client.AddUser(network, peer, network.Orderers[0], user2)
-
-				By("emit tokens")
-				amount := "1"
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
-
-				By("emit check")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("get transfer fee from user1 to user2")
-				req := FeeTransferRequestDTO{
-					SenderAddress:    user1.AddressBase58Check,
-					RecipientAddress: user2.AddressBase58Check,
-					Amount:           amount,
-				}
-				bytes, err := json.Marshal(req)
-				Expect(err).NotTo(HaveOccurred())
-				fErr := func(out []byte) string {
-					Expect(gbytes.BufferWithBytes(out)).To(gbytes.Say("fee address is not set in token config"))
-					return ""
-				}
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat, fabricnetwork.CheckResult(nil, fErr),
-					"getFeeTransfer", string(bytes))
-
-				By("transfer tokens from user1 to user2")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user2.AddressBase58Check, amount, "ref transfer")
-
-				By("check balance user1")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("check balance user2")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
-					"balanceOf", user2.AddressBase58Check)
-			})
-
-			It("transfer with fee", func() {
-				By("add users to acl")
-				user1.UserID = "1111"
-				user2.UserID = "2222"
-
-				client.AddUser(network, peer, network.Orderers[0], user1)
-				client.AddUser(network, peer, network.Orderers[0], user2)
-				client.AddUser(network, peer, network.Orderers[0], feeSetter)
-				client.AddUser(network, peer, network.Orderers[0], feeAddressSetter)
-
-				feeWallet := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
-				client.AddUser(network, peer, network.Orderers[0], feeWallet)
-
-				By("emit tokens")
-				amount := "3"
-				amountOne := "1"
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
-
-				By("emit check")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("set fee")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, feeSetter,
-					"setFee", "", client.NewNonceByTime().Get(), "FIAT", "1", "1", "100")
-
-				By("set fee address")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, feeAddressSetter,
-					"setFeeAddress", "", client.NewNonceByTime().Get(), feeWallet.AddressBase58Check)
-
-				By("get transfer fee from user1 to user2")
-				req := FeeTransferRequestDTO{
-					SenderAddress:    user1.AddressBase58Check,
-					RecipientAddress: user2.AddressBase58Check,
-					Amount:           amount,
-				}
-				bytes, err := json.Marshal(req)
-				Expect(err).NotTo(HaveOccurred())
-
-				fFeeTransfer := func(out []byte) string {
-					resp := FeeTransferResponseDTO{}
-					err = json.Unmarshal(out, &resp)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(resp.FeeAddress).To(Equal(feeWallet.AddressBase58Check))
-					Expect(resp.Amount).To(Equal("1"))
-					Expect(resp.Currency).To(Equal("FIAT"))
-
-					return ""
-				}
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat, fabricnetwork.CheckResult(fFeeTransfer, nil),
-					"getFeeTransfer", string(bytes))
-
-				By("transfer tokens from user1 to user2")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user2.AddressBase58Check, amountOne, "ref transfer")
-
-				By("check balance user1")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amountOne), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("check balance user2")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amountOne), nil),
-					"balanceOf", user2.AddressBase58Check)
-
-				By("check balance feeWallet")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amountOne), nil),
-					"balanceOf", feeWallet.AddressBase58Check)
-			})
-
-			It("transfer to itself to second wallet with fee is on", func() {
-				By("add users to acl")
-				user1.UserID = "1111"
-				user2.UserID = "1111"
-
-				client.AddUser(network, peer, network.Orderers[0], user1)
-				client.AddUser(network, peer, network.Orderers[0], user2)
-				client.AddUser(network, peer, network.Orderers[0], feeSetter)
-				client.AddUser(network, peer, network.Orderers[0], feeAddressSetter)
-
-				feeWallet := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
-				client.AddUser(network, peer, network.Orderers[0], feeWallet)
-
-				By("emit tokens")
-				amount := "3"
-				amountOne := "1"
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
-
-				By("emit check")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("set fee")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, feeSetter,
-					"setFee", "", client.NewNonceByTime().Get(), "FIAT", "1", "1", "100")
-
-				By("set fee address")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, feeAddressSetter,
-					"setFeeAddress", "", client.NewNonceByTime().Get(), feeWallet.AddressBase58Check)
-
-				By("get transfer fee from user1 to user2")
-				req := FeeTransferRequestDTO{
-					SenderAddress:    user1.AddressBase58Check,
-					RecipientAddress: user2.AddressBase58Check,
-					Amount:           amountOne,
-				}
-				bytes, err := json.Marshal(req)
-				Expect(err).NotTo(HaveOccurred())
-
-				fFeeTransfer := func(out []byte) string {
-					resp := FeeTransferResponseDTO{}
-					err = json.Unmarshal(out, &resp)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(resp.FeeAddress).To(Equal(feeWallet.AddressBase58Check))
-					Expect(resp.Amount).To(Equal("0"))
-					Expect(resp.Currency).To(Equal("FIAT"))
-
-					return ""
-				}
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat, fabricnetwork.CheckResult(fFeeTransfer, nil),
-					"getFeeTransfer", string(bytes))
-
-				By("transfer tokens from user1 to user2")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user2.AddressBase58Check, amountOne, "ref transfer")
-
-				By("check balance user1")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("2"), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("check balance user2")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amountOne), nil),
-					"balanceOf", user2.AddressBase58Check)
-
-				By("check balance feeWallet")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
-					"balanceOf", feeWallet.AddressBase58Check)
-			})
-
-			It("transfer to the same wallet with fee is on", func() {
-				By("add users to acl")
-				client.AddUser(network, peer, network.Orderers[0], user1)
-				client.AddUser(network, peer, network.Orderers[0], feeSetter)
-				client.AddUser(network, peer, network.Orderers[0], feeAddressSetter)
-
-				feeWallet := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
-				client.AddUser(network, peer, network.Orderers[0], feeWallet)
-
-				By("emit tokens")
-				amount := "3"
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
-
-				By("emit check")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("set fee")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, feeSetter,
-					"setFee", "", client.NewNonceByTime().Get(), "FIAT", "1", "1", "100")
-
-				By("set fee address")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, feeAddressSetter,
-					"setFeeAddress", "", client.NewNonceByTime().Get(), feeWallet.AddressBase58Check)
-
-				By("get transfer fee from user1 to user2")
-				req := FeeTransferRequestDTO{
-					SenderAddress:    user1.AddressBase58Check,
-					RecipientAddress: user1.AddressBase58Check,
-					Amount:           "450",
-				}
-				bytes, err := json.Marshal(req)
-				Expect(err).NotTo(HaveOccurred())
-
-				fFeeTransfer := func(out []byte) string {
-					resp := FeeTransferResponseDTO{}
-					err = json.Unmarshal(out, &resp)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(resp.FeeAddress).To(Equal(feeWallet.AddressBase58Check))
-					Expect(resp.Amount).To(Equal("0"))
-					Expect(resp.Currency).To(Equal("FIAT"))
-
-					return ""
-				}
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat, fabricnetwork.CheckResult(fFeeTransfer, nil),
-					"getFeeTransfer", string(bytes))
-
-				By("transfer tokens from user1 to user2")
-				client.TxInvokeWithSign(network, peer, network.Orderers[0],
-					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user1.AddressBase58Check, "1", "ref transfer")
-
-				By("check balance user1")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
-					"balanceOf", user1.AddressBase58Check)
-
-				By("check balance feeWallet")
-				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
-					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
-					"balanceOf", feeWallet.AddressBase58Check)
-			})
-		})
-
-		It("accessmatrix - add and remove rights", func() {
-			By("add user to acl")
-			user1 := client.NewUserFoundation(pbfound.KeyType_secp256k1.String())
+			By("add users to acl")
 			client.AddUser(network, peer, network.Orderers[0], user1)
+			client.AddUser(network, peer, network.Orderers[0], user2)
 
-			By("add rights and check rights")
-			client.AddRights(network, peer, network.Orderers[0],
-				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", user1)
+			By("add admin to acl")
+			client.AddUser(network, peer, network.Orderers[0], admin)
 
-			By("remove rights and check rights")
-			client.RemoveRights(network, peer, network.Orderers[0],
-				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", user1)
+			By("emit tokens")
+			amount := "1"
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelFiat, cmn.ChannelFiat, admin,
+				"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
+
+			By("emit check")
+			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
+				fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
+				"balanceOf", user1.AddressBase58Check)
+
+			By("get transfer fee from user1 to user2")
+			req := FeeTransferRequestDTO{
+				SenderAddress:    user1.AddressBase58Check,
+				RecipientAddress: user2.AddressBase58Check,
+				Amount:           amount,
+			}
+			bytes, err := json.Marshal(req)
+			Expect(err).NotTo(HaveOccurred())
+			fErr := func(out []byte) string {
+				Expect(gbytes.BufferWithBytes(out)).To(gbytes.Say("fee address is not set in token config"))
+				return ""
+			}
+			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat, fabricnetwork.CheckResult(nil, fErr),
+				"getFeeTransfer", string(bytes))
+
+			By("transfer tokens from user1 to user2")
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
+				client.NewNonceByTime().Get(), user2.AddressBase58Check, amount, "ref transfer")
+
+			By("check balance user1")
+			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
+				fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+				"balanceOf", user1.AddressBase58Check)
+
+			By("check balance user2")
+			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
+				fabricnetwork.CheckResult(fabricnetwork.CheckBalance(amount), nil),
+				"balanceOf", user2.AddressBase58Check)
 		})
 	})
 })

@@ -266,7 +266,7 @@ var _ = Describe("Channel transfer foundation Tests", func() {
 		requestID := uuid.NewString()
 		nonce := client.NewNonceByTime().Get()
 		signArgs := append(append([]string{"channelTransferByAdmin", requestID, cmn.ChannelFiat, cmn.ChannelFiat}, channelTransferArgs...), nonce)
-		publicKey, sign, err := admin.Sign(signArgs...)
+		publicKey, sign, err := admin.SignArguments(signArgs...)
 		Expect(err).NotTo(HaveOccurred())
 
 		transfer := &cligrpc.TransferBeginAdminRequest{
@@ -348,7 +348,7 @@ var _ = Describe("Channel transfer foundation Tests", func() {
 		requestID := uuid.NewString()
 		nonce := client.NewNonceByTime().Get()
 		signArgs := append(append([]string{"channelTransferByCustomer", requestID, cmn.ChannelFiat, cmn.ChannelFiat}, channelTransferArgs...), nonce)
-		publicKey, sign, err := user.Sign(signArgs...)
+		publicKey, sign, err := user.SignArguments(signArgs...)
 		Expect(err).NotTo(HaveOccurred())
 
 		transfer := &cligrpc.TransferBeginCustomerRequest{
@@ -457,7 +457,7 @@ var _ = Describe("Channel transfer foundation Tests", func() {
 		requestID := uuid.NewString()
 		nonce := client.NewNonceByTime().Get()
 		signArgs := append(append([]string{"channelTransferByCustomer", requestID, cmn.ChannelFiat, cmn.ChannelFiat}, channelTransferArgs...), nonce)
-		publicKey, sign, err := user.Sign(signArgs...)
+		publicKey, sign, err := user.SignArguments(signArgs...)
 		Expect(err).NotTo(HaveOccurred())
 
 		transfer := &cligrpc.TransferBeginCustomerRequest{
