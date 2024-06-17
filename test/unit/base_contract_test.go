@@ -20,22 +20,42 @@ const (
 
 	testMessageEmptyNonce = "\"0\""
 
-	testGetNonceFnName   = "getNonce"
-	testHelloWorldFnName = "helloWorld"
+	testGetNonceFnName      = "getNonce"
+	testHelloWorldFnName    = "helloWorld"
+	testHelloWorldSetFnName = "helloWorldSet"
 )
 
 type TestToken struct {
 	token.BaseToken
 }
 
-type TestStruct struct{}
+type TestStruct struct {
+	hello string
+}
 
-func (*TestStruct) EncodeToBytes() ([]byte, error) {
-	return []byte("Hello World"), nil
+func (s *TestStruct) EncodeToBytes() ([]byte, error) {
+	if s.hello == "" {
+		s.hello = "Hello World"
+	}
+
+	return []byte(s.hello), nil
+}
+
+func (s *TestStruct) DecodeFromBytes(in []byte) error {
+	if string(in) == "" {
+		return errors.New("hello world should not be empty")
+	}
+
+	s.hello = string(in)
+	return nil
 }
 
 func (tt *TestToken) QueryHelloWorld() (*TestStruct, error) {
 	return &TestStruct{}, nil
+}
+
+func (tt *TestToken) TxHelloWorldSet(in *TestStruct) error {
+	return nil
 }
 
 func (tt *TestToken) TxTestCall() error {
@@ -68,6 +88,44 @@ func (tt *TestToken) TxEmissionAdd(sender *types.Sender, address *types.Address,
 	return tt.EmissionAdd(amount)
 }
 
+func TestBytesEncoder(t *testing.T) {
+	ledgerMock := mock.NewLedger(t)
+	owner := ledgerMock.NewWallet()
+
+	tt := &TestToken{}
+	config := makeBaseTokenConfig(testTokenName, testTokenSymbol, 8,
+		owner.Address(), "", "", "", nil)
+
+	initMsg := ledgerMock.NewCC(testTokenCCName, tt, config)
+	require.Empty(t, initMsg)
+
+	t.Run("Get bytes encoded response", func(t *testing.T) {
+		helloWorld := owner.Invoke(testTokenCCName, testHelloWorldFnName)
+		require.Equal(t, helloWorld, "Hello World")
+	})
+}
+
+func TestBytesDecoder(t *testing.T) {
+	ledgerMock := mock.NewLedger(t)
+	owner := ledgerMock.NewWallet()
+
+	tt := &TestToken{}
+	config := makeBaseTokenConfig(testTokenName, testTokenSymbol, 8,
+		owner.Address(), "", "", "", nil)
+
+	initMsg := ledgerMock.NewCC(testTokenCCName, tt, config)
+	require.Empty(t, initMsg)
+
+	t.Run("Set bytes encoded response", func(t *testing.T) {
+		owner.Invoke(testTokenCCName, testHelloWorldSetFnName, "Hi!")
+	})
+
+	t.Run("Set bytes encoded response", func(t *testing.T) {
+		err := owner.InvokeWithError(testTokenCCName, testHelloWorldSetFnName, "")
+		require.Error(t, err)
+	})
+}
+
 // TestGetEmptyNonce - Checking that new wallet have empty nonce
 func TestGetEmptyNonce(t *testing.T) {
 	ledgerMock := mock.NewLedger(t)
@@ -83,23 +141,6 @@ func TestGetEmptyNonce(t *testing.T) {
 	t.Run("Get nonce with new wallet", func(t *testing.T) {
 		nonce := owner.Invoke(testTokenCCName, testGetNonceFnName, owner.Address())
 		require.Equal(t, nonce, testMessageEmptyNonce)
-	})
-}
-
-func TestBytesEncoder(t *testing.T) {
-	ledgerMock := mock.NewLedger(t)
-	owner := ledgerMock.NewWallet()
-
-	tt := &TestToken{}
-	config := makeBaseTokenConfig(testTokenName, testTokenSymbol, 8,
-		owner.Address(), "", "", "", nil)
-
-	initMsg := ledgerMock.NewCC(testTokenCCName, tt, config)
-	require.Empty(t, initMsg)
-
-	t.Run("Get bytes encoded response", func(t *testing.T) {
-		helloWorld := owner.Invoke(testTokenCCName, testHelloWorldFnName)
-		require.Equal(t, helloWorld, "Hello World")
 	})
 }
 
