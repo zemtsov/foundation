@@ -76,7 +76,7 @@ func NBTxInvokeWithSign(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Order
 }
 
 func invokeTx(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer, userOrg string,
-	channel string, ccName string, args ...string) (txId string) {
+	channel string, ccName string, checkErr CheckResultFunc, args ...string) (txId string) {
 	lh := nwo.GetLedgerHeight(network, peer, channel)
 
 	sess, err := network.PeerUserSession(peer, userOrg, commands.ChaincodeInvoke{
@@ -103,12 +103,18 @@ func invokeTx(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer, userOr
 
 	By("creating the deliver client to peer " + peer.ID())
 	pcc := network.PeerClientConn(peer)
-	defer pcc.Close()
+	defer func() {
+		err := pcc.Close()
+		Expect(err).NotTo(HaveOccurred())
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), network.EventuallyTimeout)
 	defer cancel()
 	dc, err := pb.NewDeliverClient(pcc).Deliver(ctx)
 	Expect(err).NotTo(HaveOccurred())
-	defer dc.CloseSend()
+	defer func() {
+		err := dc.CloseSend()
+		Expect(err).NotTo(HaveOccurred())
+	}()
 
 	By("starting filtered delivery on peer " + peer.ID())
 	deliverEnvelope, err := protoutil.CreateSignedEnvelope(
@@ -205,6 +211,13 @@ func invokeTx(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer, userOr
 					for _, r := range batchResponse.TxResponses {
 						if hex.EncodeToString(r.GetId()) == txId {
 							Expect(isValid).To(BeTrue())
+							if checkErr != nil {
+								Expect(r.Error).NotTo(BeNil())
+								res := checkErr(nil, 1, []byte(r.Error.Error), nil)
+								Expect(res).Should(BeEmpty())
+								return
+							}
+							Expect(r.Error).To(BeNil())
 							return
 						}
 					}
@@ -216,26 +229,26 @@ func invokeTx(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer, userOr
 
 // TxInvoke func for invoke to foundation fabric
 func TxInvoke(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer,
-	channel string, ccName string, args ...string) (txId string) {
-	return invokeTx(network, peer, orderer, "User1", channel, ccName, args...)
+	channel string, ccName string, checkErr CheckResultFunc, args ...string) (txId string) {
+	return invokeTx(network, peer, orderer, "User1", channel, ccName, checkErr, args...)
 }
 
 // TxInvokeByRobot func for invoke to foundation fabric from robot
 func TxInvokeByRobot(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer,
-	channel string, ccName string, args ...string) (txId string) {
-	return invokeTx(network, peer, orderer, "User2", channel, ccName, args...)
+	channel string, ccName string, checkErr CheckResultFunc, args ...string) (txId string) {
+	return invokeTx(network, peer, orderer, "User2", channel, ccName, checkErr, args...)
 }
 
 // TxInvokeWithSign func for invoke with sign to foundation fabric
 func TxInvokeWithSign(network *nwo.Network, peer *nwo.Peer, orderer *nwo.Orderer,
 	channel string, ccName string, user *UserFoundation,
-	fn string, requestID string, nonce string, args ...string) (txId string) {
+	fn string, requestID string, nonce string, checkErr CheckResultFunc, args ...string) (txId string) {
 	ctorArgs := append(append([]string{fn, requestID, channel, ccName}, args...), nonce)
 	pubKey, sMsg, err := user.Sign(ctorArgs...)
 	Expect(err).NotTo(HaveOccurred())
 
 	ctorArgs = append(ctorArgs, pubKey, base58.Encode(sMsg))
-	return TxInvoke(network, peer, orderer, channel, ccName, ctorArgs...)
+	return TxInvoke(network, peer, orderer, channel, ccName, checkErr, ctorArgs...)
 }
 
 func scanTxIDInLog(data []byte) string {

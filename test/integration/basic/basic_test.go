@@ -12,6 +12,7 @@ import (
 	"github.com/anoideaopen/foundation/test/integration/cmn/client"
 	"github.com/anoideaopen/foundation/test/integration/cmn/fabricnetwork"
 	"github.com/anoideaopen/foundation/test/integration/cmn/runner"
+	"github.com/bsm/gomega/gexec"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/hyperledger/fabric/integration/nwo"
 	"github.com/hyperledger/fabric/integration/nwo/commands"
@@ -20,10 +21,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"github.com/onsi/gomega/gexec"
 	"github.com/tedsuo/ifrit"
 	ginkgomon "github.com/tedsuo/ifrit/ginkgomon_v2"
 )
+
+const fnMethodWithRights = "withRights"
 
 var _ = Describe("Basic foundation Tests", func() {
 	var (
@@ -245,7 +247,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
 				"allowedBalanceOf", user.AddressBase58Check, "CC")
 
-			By("send a invoke that is similar to request")
+			By("send an invoke that is similar to request")
 			client.NBTxInvoke(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat,
 				"allowedBalanceAdd", "CC", user.AddressBase58Check, "50", "add some assets")
@@ -280,7 +282,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				amount := "1"
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
+					"emit", "", client.NewNonceByTime().Get(), nil, user1.AddressBase58Check, amount)
 
 				By("emit check")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -305,7 +307,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				By("transfer tokens from user1 to user2")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user2.AddressBase58Check, amount, "ref transfer")
+					client.NewNonceByTime().Get(), nil, user2.AddressBase58Check, amount, "ref transfer")
 
 				By("check balance user1")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -336,7 +338,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				amountOne := "1"
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
+					"emit", "", client.NewNonceByTime().Get(), nil, user1.AddressBase58Check, amount)
 
 				By("emit check")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -346,12 +348,12 @@ var _ = Describe("Basic foundation Tests", func() {
 				By("set fee")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, feeSetter,
-					"setFee", "", client.NewNonceByTime().Get(), "FIAT", "1", "1", "100")
+					"setFee", "", client.NewNonceByTime().Get(), nil, "FIAT", "1", "1", "100")
 
 				By("set fee address")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, feeAddressSetter,
-					"setFeeAddress", "", client.NewNonceByTime().Get(), feeWallet.AddressBase58Check)
+					"setFeeAddress", "", client.NewNonceByTime().Get(), nil, feeWallet.AddressBase58Check)
 
 				By("get transfer fee from user1 to user2")
 				req := FeeTransferRequestDTO{
@@ -378,7 +380,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				By("transfer tokens from user1 to user2")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user2.AddressBase58Check, amountOne, "ref transfer")
+					client.NewNonceByTime().Get(), nil, user2.AddressBase58Check, amountOne, "ref transfer")
 
 				By("check balance user1")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -414,7 +416,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				amountOne := "1"
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
+					"emit", "", client.NewNonceByTime().Get(), nil, user1.AddressBase58Check, amount)
 
 				By("emit check")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -424,12 +426,12 @@ var _ = Describe("Basic foundation Tests", func() {
 				By("set fee")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, feeSetter,
-					"setFee", "", client.NewNonceByTime().Get(), "FIAT", "1", "1", "100")
+					"setFee", "", client.NewNonceByTime().Get(), nil, "FIAT", "1", "1", "100")
 
 				By("set fee address")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, feeAddressSetter,
-					"setFeeAddress", "", client.NewNonceByTime().Get(), feeWallet.AddressBase58Check)
+					"setFeeAddress", "", client.NewNonceByTime().Get(), nil, feeWallet.AddressBase58Check)
 
 				By("get transfer fee from user1 to user2")
 				req := FeeTransferRequestDTO{
@@ -456,7 +458,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				By("transfer tokens from user1 to user2")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user2.AddressBase58Check, amountOne, "ref transfer")
+					client.NewNonceByTime().Get(), nil, user2.AddressBase58Check, amountOne, "ref transfer")
 
 				By("check balance user1")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -487,7 +489,7 @@ var _ = Describe("Basic foundation Tests", func() {
 				amount := "3"
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, admin,
-					"emit", "", client.NewNonceByTime().Get(), user1.AddressBase58Check, amount)
+					"emit", "", client.NewNonceByTime().Get(), nil, user1.AddressBase58Check, amount)
 
 				By("emit check")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -497,12 +499,12 @@ var _ = Describe("Basic foundation Tests", func() {
 				By("set fee")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, feeSetter,
-					"setFee", "", client.NewNonceByTime().Get(), "FIAT", "1", "1", "100")
+					"setFee", "", client.NewNonceByTime().Get(), nil, "FIAT", "1", "1", "100")
 
 				By("set fee address")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, feeAddressSetter,
-					"setFeeAddress", "", client.NewNonceByTime().Get(), feeWallet.AddressBase58Check)
+					"setFeeAddress", "", client.NewNonceByTime().Get(), nil, feeWallet.AddressBase58Check)
 
 				By("get transfer fee from user1 to user2")
 				req := FeeTransferRequestDTO{
@@ -526,10 +528,10 @@ var _ = Describe("Basic foundation Tests", func() {
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat, fabricnetwork.CheckResult(fFeeTransfer, nil),
 					"getFeeTransfer", string(bytes))
 
-				By("transfer tokens from user1 to user2")
+				By("NEGATIVE: transfer tokens from user1 to user2")
 				client.TxInvokeWithSign(network, peer, network.Orderers[0],
 					cmn.ChannelFiat, cmn.ChannelFiat, user1, "transfer", "",
-					client.NewNonceByTime().Get(), user1.AddressBase58Check, "1", "ref transfer")
+					client.NewNonceByTime().Get(), fabricnetwork.CheckResult(nil, fabricnetwork.CheckTxResponseResult("TxTransfer: sender and recipient are same users")), user1.AddressBase58Check, "1", "ref transfer")
 
 				By("check balance user1")
 				client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -548,13 +550,32 @@ var _ = Describe("Basic foundation Tests", func() {
 			user1 := client.NewUserFoundation(pbfound.KeyType_ed25519.String())
 			client.AddUser(network, peer, network.Orderers[0], user1)
 
+			user2 := client.NewUserFoundation(pbfound.KeyType_ed25519.String())
+			client.AddUser(network, peer, network.Orderers[0], user2)
+
+			By("invoking industrial chaincode with user have no rights")
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, user1, fnMethodWithRights, "",
+				client.NewNonceByTime().Get(), fabricnetwork.CheckResult(nil, fabricnetwork.CheckTxResponseResult("unauthorized")))
+
 			By("add rights and check rights")
 			client.AddRights(network, peer, network.Orderers[0],
-				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", user1)
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "issuer", "", user1)
+
+			By("invoking industrial chaincode with acl right user")
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, user1, fnMethodWithRights, "",
+				client.NewNonceByTime().Get(), nil)
 
 			By("remove rights and check rights")
 			client.RemoveRights(network, peer, network.Orderers[0],
-				cmn.ChannelAcl, cmn.ChannelAcl, "issuer", "testOperation", user1)
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "issuer", "", user1)
+
+			By("invoking industrial chaincode with user acl rights removed")
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, user1, fnMethodWithRights, "",
+				client.NewNonceByTime().Get(), fabricnetwork.CheckResult(nil, fabricnetwork.CheckTxResponseResult("unauthorized")))
+
 		})
 	})
 })

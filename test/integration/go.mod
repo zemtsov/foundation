@@ -8,6 +8,7 @@ require (
 	github.com/anoideaopen/channel-transfer v0.0.2-0.20240605150922-e13f00983d0b
 	github.com/anoideaopen/foundation v0.0.2-0.20240611130553-67a5dbb1fa4f
 	github.com/anoideaopen/robot v0.0.2-0.20240605153321-0e09032227bf
+	github.com/bsm/gomega v1.26.0
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/fsouza/go-dockerclient v1.10.0
 	github.com/go-redis/redis/v8 v8.11.4
