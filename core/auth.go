@@ -1,21 +1,19 @@
 package core
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"math/big"
 	"strconv"
 	"strings"
 
 	"github.com/anoideaopen/foundation/core/contract"
+	"github.com/anoideaopen/foundation/core/eth"
 	"github.com/anoideaopen/foundation/core/gost"
 	"github.com/anoideaopen/foundation/core/helpers"
 	"github.com/anoideaopen/foundation/core/types"
 	pb "github.com/anoideaopen/foundation/proto"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ddulesov/gogost/gost3410"
-	eth "github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto" //nolint:staticcheck
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/peer"
@@ -121,6 +119,7 @@ func validateSignaturesInInvocation(
 	var (
 		digestSHA3 []byte
 		digestGOST []byte
+		digestEth  []byte
 		err        error
 	)
 
@@ -138,19 +137,10 @@ func validateSignaturesInInvocation(
 		valid := false
 		switch invocation.keyTypes[i] {
 		case pb.KeyType_secp256k1:
-			if digestSHA3 == nil {
-				digestSHA3Raw := sha3.Sum256(message)
-				digestSHA3 = digestSHA3Raw[:]
+			if digestEth == nil {
+				digestEth = eth.Hash(message)
 			}
-			if publicKey[0] == 0x04 {
-				publicKey = publicKey[1:]
-			}
-			ecdsaKey := &ecdsa.PublicKey{
-				Curve: eth.S256(),
-				X:     new(big.Int).SetBytes(publicKey[:32]),
-				Y:     new(big.Int).SetBytes(publicKey[32:]),
-			}
-			valid = ecdsa.VerifyASN1(ecdsaKey, digestSHA3, signature)
+			valid = eth.Verify(publicKey, digestEth, signature)
 		case pb.KeyType_gost:
 			if digestGOST == nil {
 				digestGOSTRaw := gost.Sum256(message)

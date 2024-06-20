@@ -15,6 +15,7 @@ import (
 
 	"github.com/anoideaopen/foundation/core"
 	"github.com/anoideaopen/foundation/core/balance"
+	"github.com/anoideaopen/foundation/core/eth"
 	"github.com/anoideaopen/foundation/core/gost"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
@@ -378,7 +379,7 @@ func (w *Wallet) publicKeyBytes() []byte {
 	case proto.KeyType_gost:
 		return w.pKeyGOST.Raw()
 	case proto.KeyType_secp256k1:
-		return append(w.pKeySecp256k1.X.Bytes(), w.pKeySecp256k1.Y.Bytes()...)
+		return eth.PublicKeyBytes(w.pKeySecp256k1)
 	default:
 		return w.pKey
 	}
@@ -419,9 +420,8 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 		signature, _ = w.sKeyGOST.SignDigest(digest, rand.Reader)
 		signature = reverseBytes(signature)
 	case proto.KeyType_secp256k1:
-		digestRawSHA3 := sha3.Sum256(message)
-		digest = digestRawSHA3[:]
-		signature, err = ecdsa.SignASN1(rand.Reader, w.sKeySecp256k1, digest)
+		digest = eth.Hash(message)
+		signature, err = eth.Sign(digest, w.sKeySecp256k1)
 		require.NoError(w.ledger.t, err)
 	default:
 		digestRawSHA3 := sha3.Sum256(message)

@@ -19,13 +19,13 @@ import (
 	"github.com/anoideaopen/foundation/core"
 	"github.com/anoideaopen/foundation/core/cctransfer"
 	"github.com/anoideaopen/foundation/core/config"
+	"github.com/anoideaopen/foundation/core/eth"
 	"github.com/anoideaopen/foundation/core/multiswap"
 	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/mock/stub"
 	"github.com/anoideaopen/foundation/proto"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ddulesov/gogost/gost3410"
-	eth "github.com/ethereum/go-ethereum/crypto"
 	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
 	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-protos-go/peer"
@@ -244,7 +244,7 @@ func (l *Ledger) NewWallet() *Wallet {
 		pKeySecp256k1, sKeySecp256k1 = generateSecp256k1Keys(l.t)
 		hash                         = sha3.Sum256(pKey)
 		hashGOST                     = sha3.Sum256(pKeyGOST.Raw())
-		hashSecp256k1                = sha3.Sum256(append(pKeySecp256k1.X.Bytes(), pKeySecp256k1.Y.Bytes()...))
+		hashSecp256k1                = sha3.Sum256(eth.PublicKeyBytes(pKeySecp256k1))
 	)
 	return &Wallet{
 		ledger:        l,
@@ -521,7 +521,7 @@ func generateGOSTKeys(t *testing.T) (*gost3410.PublicKey, *gost3410.PrivateKey) 
 }
 
 func generateSecp256k1Keys(t *testing.T) (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
-	sKey, err := ecdsa.GenerateKey(eth.S256(), rand.Reader)
+	sKey, err := eth.NewKey()
 	require.NoError(t, err)
 	return &sKey.PublicKey, sKey
 }
