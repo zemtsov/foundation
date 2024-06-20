@@ -120,7 +120,8 @@ func (u *UserFoundation) sign(message []byte) (signMsg []byte, err error) {
 		}
 
 	case pbfound.KeyType_secp256k1.String():
-		hash := eth.Hash(message)
+		sha256 := sha3.Sum256(message)
+		hash := eth.Hash(sha256[:])
 		signMsg = signMessageSecp256k1(u.PrivateKeyBytes, hash)
 		err = verifySecp256k1(u.PublicKeyBytes, hash, signMsg)
 		if err != nil {

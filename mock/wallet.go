@@ -420,7 +420,8 @@ func (w *Wallet) sign(fn, ch string, args ...string) ([]string, string) {
 		signature, _ = w.sKeyGOST.SignDigest(digest, rand.Reader)
 		signature = reverseBytes(signature)
 	case proto.KeyType_secp256k1:
-		digest = eth.Hash(message)
+		digestSHA3 := sha3.Sum256(message)
+		digest = eth.Hash(digestSHA3[:])
 		signature, err = eth.Sign(digest, w.sKeySecp256k1)
 		require.NoError(w.ledger.t, err)
 	default:
