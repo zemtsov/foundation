@@ -259,6 +259,9 @@ func (bc *BaseContract) TokenBalanceGetLocked(address *types.Address) (*big.Int,
 }
 
 func (bc *BaseContract) TokenBalanceLock(address *types.Address, amount *big.Int) error {
+	if stub, ok := bc.GetStub().(*cachestub.TxCacheStub); ok {
+		stub.AddAccountingRecord(bc.config.GetSymbol(), address, address, amount, "token balance lock")
+	}
 	return balance.Move(
 		bc.stub,
 		balance.BalanceTypeToken,
@@ -271,6 +274,9 @@ func (bc *BaseContract) TokenBalanceLock(address *types.Address, amount *big.Int
 }
 
 func (bc *BaseContract) TokenBalanceUnlock(address *types.Address, amount *big.Int) error {
+	if stub, ok := bc.GetStub().(*cachestub.TxCacheStub); ok {
+		stub.AddAccountingRecord(bc.config.GetSymbol(), address, address, amount, "token balance unlock")
+	}
 	return balance.Move(
 		bc.stub,
 		balance.BalanceTypeTokenLocked,
@@ -453,6 +459,10 @@ func (bc *BaseContract) AllowedBalanceLock(
 	address *types.Address,
 	amount *big.Int,
 ) error {
+	if stub, ok := bc.GetStub().(*cachestub.TxCacheStub); ok {
+		stub.AddAccountingRecord(bc.config.GetSymbol(), address, address, amount, "allowed balance lock")
+	}
+
 	return balance.Move(
 		bc.stub,
 		balance.BalanceTypeAllowed,
@@ -469,6 +479,10 @@ func (bc *BaseContract) AllowedBalanceUnLock(
 	address *types.Address,
 	amount *big.Int,
 ) error {
+	if stub, ok := bc.GetStub().(*cachestub.TxCacheStub); ok {
+		stub.AddAccountingRecord(bc.config.GetSymbol(), address, address, amount, "allowed balance unlock")
+	}
+
 	return balance.Move(
 		bc.stub,
 		balance.BalanceTypeAllowedLocked,
@@ -543,6 +557,9 @@ func (bc *BaseContract) IndustrialBalanceLock(
 ) error {
 	parts := strings.Split(token, "_")
 	token = parts[len(parts)-1]
+	if stub, ok := bc.GetStub().(*cachestub.TxCacheStub); ok {
+		stub.AddAccountingRecord(bc.config.GetSymbol()+"_"+token, address, address, amount, "industrial balance lock")
+	}
 
 	return balance.Move(
 		bc.stub,
@@ -562,6 +579,9 @@ func (bc *BaseContract) IndustrialBalanceUnLock(
 ) error {
 	parts := strings.Split(token, "_")
 	token = parts[len(parts)-1]
+	if stub, ok := bc.GetStub().(*cachestub.TxCacheStub); ok {
+		stub.AddAccountingRecord(bc.config.GetSymbol()+"_"+token, address, address, amount, "industrial balance unlock")
+	}
 
 	return balance.Move(
 		bc.stub,
