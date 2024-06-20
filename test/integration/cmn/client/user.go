@@ -6,12 +6,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 
+	"github.com/anoideaopen/foundation/core/eth"
 	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/btcsuite/btcutil/base58"
-	eth "github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -40,12 +39,12 @@ func NewUserFoundation(keyType string) *UserFoundation {
 
 	case pbfound.KeyType_secp256k1.String():
 		var privateKey *ecdsa.PrivateKey
-		privateKey, err = ecdsa.GenerateKey(eth.S256(), rand.Reader)
+		privateKey, err = eth.NewKey()
 		if err != nil {
 			return &UserFoundation{}
 		}
-		privateKeyBytes = privateKey.D.Bytes()
-		publicKeyBytes = append(privateKey.X.Bytes(), privateKey.Y.Bytes()...)
+		privateKeyBytes = eth.PrivateKeyBytes(privateKey)
+		publicKeyBytes = eth.PublicKeyBytes(&privateKey.PublicKey)
 
 	default:
 		return &UserFoundation{}
@@ -101,9 +100,9 @@ func (u *UserFoundation) Sign(args ...string) (publicKeyBase58 string, signMsg [
 	msg = append(msg, args...)
 	msg = append(msg, publicKeyBase58)
 
-	bytesToSign := sha3.Sum256([]byte(strings.Join(msg, "")))
+	message := []byte(strings.Join(msg, ""))
 
-	if signMsg, err = u.sign(bytesToSign[:]); err != nil {
+	if signMsg, err = u.sign(message); err != nil {
 		return "", nil, err
 	}
 
@@ -113,15 +112,17 @@ func (u *UserFoundation) Sign(args ...string) (publicKeyBase58 string, signMsg [
 func (u *UserFoundation) sign(message []byte) (signMsg []byte, err error) {
 	switch u.PublicKeyType {
 	case pbfound.KeyType_ed25519.String():
-		signMsg = signMessageEd25519(u.PrivateKeyBytes, message)
-		err = verifyEd25519(u.PublicKeyBytes, message, signMsg)
+		hash := sha3.Sum256(message)
+		signMsg = signMessageEd25519(u.PrivateKeyBytes, hash[:])
+		err = verifyEd25519(u.PublicKeyBytes, hash[:], signMsg)
 		if err != nil {
 			return nil, err
 		}
 
 	case pbfound.KeyType_secp256k1.String():
-		signMsg = signMessageSecp256k1(u.PrivateKeyBytes, message)
-		err = verifySecp256k1(u.PublicKeyBytes, message, signMsg)
+		hash := eth.Hash(message)
+		signMsg = signMessageSecp256k1(u.PrivateKeyBytes, hash)
+		err = verifySecp256k1(u.PublicKeyBytes, hash, signMsg)
 		if err != nil {
 			return nil, err
 		}
@@ -178,11 +179,11 @@ func verifyEd25519(publicKey []byte, bytesToSign []byte, sMsg []byte) error {
 
 // signMessageSecp256k1 - signs a message with private key in secp256k1
 func signMessageSecp256k1(privateKeyBytes []byte, msgToSign []byte) []byte {
-	privateKey := new(ecdsa.PrivateKey)
-	privateKey.PublicKey.Curve = eth.S256()
-	privateKey.D = new(big.Int).SetBytes(privateKeyBytes)
-
-	sig, err := ecdsa.SignASN1(rand.Reader, privateKey, msgToSign)
+	privateKey, err := eth.PrivateKeyFromBytes(privateKeyBytes)
+	if err != nil {
+		return nil
+	}
+	sig, err := eth.Sign(msgToSign, privateKey)
 	if err != nil {
 		return nil
 	}
@@ -191,23 +192,7 @@ func signMessageSecp256k1(privateKeyBytes []byte, msgToSign []byte) []byte {
 
 // verifySecp256k1 - verify publicKey in secp256k1 with message and signed message
 func verifySecp256k1(publicKeyBytes []byte, message []byte, sig []byte) error {
-	const lenSecp256k1Key = 64
-
-	if publicKeyBytes[0] == 0x04 {
-		publicKeyBytes = publicKeyBytes[1:]
-	}
-
-	if len(publicKeyBytes) != lenSecp256k1Key {
-		return errors.New("invalid length of secp256k1 key")
-	}
-
-	publicKey := &ecdsa.PublicKey{
-		Curve: eth.S256(),
-		X:     new(big.Int).SetBytes(publicKeyBytes[:lenSecp256k1Key/2]),
-		Y:     new(big.Int).SetBytes(publicKeyBytes[lenSecp256k1Key/2:]),
-	}
-
-	if !ecdsa.VerifyASN1(publicKey, message, sig) {
+	if !eth.Verify(publicKeyBytes, message, sig) {
 		return errors.New("secp256k1 signature rejected")
 	}
 

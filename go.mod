@@ -6,7 +6,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/ddulesov/gogost v1.0.0
 	github.com/envoyproxy/protoc-gen-validate v0.10.1
-	github.com/ethereum/go-ethereum v1.13.15
+	github.com/ethereum/go-ethereum v1.11.6
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.4.0
 	github.com/hyperledger/fabric-chaincode-go v0.0.0-20230228194215-b84622ba6a7a
@@ -38,6 +38,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.15.0-rc.1 // indirect
 	go.opentelemetry.io/otel/metric v1.15.0-rc.1 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
+	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
