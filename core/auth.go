@@ -137,8 +137,12 @@ func validateSignaturesInInvocation(
 		valid := false
 		switch invocation.keyTypes[i] {
 		case pb.KeyType_secp256k1:
+			if digestSHA3 == nil {
+				digestSHA3Raw := sha3.Sum256(message)
+				digestSHA3 = digestSHA3Raw[:]
+			}
 			if digestEth == nil {
-				digestEth = eth.Hash(message)
+				digestEth = eth.Hash(digestSHA3)
 			}
 			valid = eth.Verify(publicKey, digestEth, signature)
 		case pb.KeyType_gost:
