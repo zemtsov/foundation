@@ -4,18 +4,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/anoideaopen/foundation/core/contract"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 )
-
-// Validator is an interface that can be implemented by types that can validate themselves.
-type Validator interface {
-	Validate() error
-}
-
-// ValidatorWithStub is an interface that can be implemented by types that can validate themselves.
-type ValidatorWithStub interface {
-	ValidateWithStub(stub shim.ChaincodeStubInterface) error
-}
 
 // ValidateArguments validates the arguments for the specified method on the given value using reflection.
 // It checks whether the specified method exists on the value 'v' and if the number of provided arguments matches
@@ -55,14 +46,14 @@ func ValidateArguments(v any, method string, stub shim.ChaincodeStubInterface, a
 	}
 
 	for i, arg := range args {
-		value, err := valueOf(arg, methodType.In(i))
+		value, err := valueOf(arg, methodType.In(i), stub)
 		if err != nil {
 			return fmt.Errorf("%w: validate %s, argument %d", err, method, i)
 		}
 
 		iface := value.Interface()
 
-		if validator, ok := iface.(Validator); ok {
+		if validator, ok := iface.(contract.Validator); ok {
 			if err := validator.Validate(); err != nil {
 				return fmt.Errorf(
 					"%w: '%s': validation failed: '%v': validate %s, argument %d",
@@ -78,7 +69,7 @@ func ValidateArguments(v any, method string, stub shim.ChaincodeStubInterface, a
 		if stub == nil {
 			continue
 		}
-		if validator, ok := iface.(ValidatorWithStub); ok {
+		if validator, ok := iface.(contract.ValidatorWithStub); ok {
 			if err := validator.ValidateWithStub(stub); err != nil {
 				return fmt.Errorf(
 					"%w: '%s': validation failed: '%v': validate %s, argument %d",
