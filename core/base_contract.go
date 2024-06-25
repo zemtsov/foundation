@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/anoideaopen/foundation/core/stringsx"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -55,7 +56,7 @@ func (bc *BaseContract) GetMethods(bci BaseContractInterface) []string {
 
 	methods := make([]string, 0, len(contractMethods))
 	for name, method := range contractMethods {
-		if !bc.isDisableMethod(method) {
+		if !bc.isMethodDisabled(method) {
 			methods = append(methods, name)
 		}
 	}
@@ -65,9 +66,17 @@ func (bc *BaseContract) GetMethods(bci BaseContractInterface) []string {
 	return methods
 }
 
-func (bc *BaseContract) isDisableMethod(method contract.Method) bool {
+func (bc *BaseContract) isMethodDisabled(method contract.Method) bool {
 	for _, disabled := range bc.config.GetOptions().GetDisabledFunctions() {
 		if method.MethodName == disabled {
+			return true
+		}
+		if bc.config.GetOptions().GetDisableSwaps() &&
+			stringsx.OneOf(method.MethodName, "QuerySwapGet", "TxSwapBegin", "TxSwapCancel") {
+			return true
+		}
+		if bc.config.GetOptions().GetDisableMultiSwaps() &&
+			stringsx.OneOf(method.MethodName, "QueryMultiSwapGet", "TxMultiSwapBegin", "TxMultiSwapCancel") {
 			return true
 		}
 	}
