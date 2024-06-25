@@ -11,6 +11,7 @@ import (
 
 	"github.com/anoideaopen/foundation/core/contract"
 	"github.com/anoideaopen/foundation/core/reflectx"
+	"github.com/anoideaopen/foundation/core/stringsx"
 	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
@@ -54,13 +55,32 @@ func (bc *BaseContract) GetMethods(bci BaseContractInterface) []string {
 	contractMethods := router.Methods()
 
 	methods := make([]string, 0, len(contractMethods))
-	for name := range contractMethods {
-		methods = append(methods, name)
+	for name, method := range contractMethods {
+		if !bc.isMethodDisabled(method) {
+			methods = append(methods, name)
+		}
 	}
 
 	sort.Strings(methods)
 
 	return methods
+}
+
+func (bc *BaseContract) isMethodDisabled(method contract.Method) bool {
+	for _, disabled := range bc.config.GetOptions().GetDisabledFunctions() {
+		if method.MethodName == disabled {
+			return true
+		}
+		if bc.config.GetOptions().GetDisableSwaps() &&
+			stringsx.OneOf(method.MethodName, "QuerySwapGet", "TxSwapBegin", "TxSwapCancel") {
+			return true
+		}
+		if bc.config.GetOptions().GetDisableMultiSwaps() &&
+			stringsx.OneOf(method.MethodName, "QueryMultiSwapGet", "TxMultiSwapBegin", "TxMultiSwapCancel") {
+			return true
+		}
+	}
+	return false
 }
 
 func (bc *BaseContract) SetStub(stub shim.ChaincodeStubInterface) {
