@@ -118,7 +118,7 @@ func UserDone(bci BaseContractInterface, swapID string, key string) peer.Respons
 		return shim.Error(ErrIncorrectSwap)
 	}
 	if s.TokenSymbol() == s.GetFrom() {
-		if err = bci.AllowedBalanceAdd(s.GetFrom(), types.AddrFromBytes(s.GetOwner()), new(big.Int).SetBytes(s.GetAmount()), "swap done"); err != nil {
+		if err = bci.AllowedBalanceAdd(s.GetToken(), types.AddrFromBytes(s.GetOwner()), new(big.Int).SetBytes(s.GetAmount()), "swap done"); err != nil {
 			return shim.Error(err.Error())
 		}
 	} else {
