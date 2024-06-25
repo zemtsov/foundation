@@ -54,13 +54,24 @@ func (bc *BaseContract) GetMethods(bci BaseContractInterface) []string {
 	contractMethods := router.Methods()
 
 	methods := make([]string, 0, len(contractMethods))
-	for name := range contractMethods {
-		methods = append(methods, name)
+	for name, method := range contractMethods {
+		if !bc.isDisableMethod(method) {
+			methods = append(methods, name)
+		}
 	}
 
 	sort.Strings(methods)
 
 	return methods
+}
+
+func (bc *BaseContract) isDisableMethod(method contract.Method) bool {
+	for _, disabled := range bc.config.GetOptions().GetDisabledFunctions() {
+		if method.MethodName == disabled {
+			return true
+		}
+	}
+	return false
 }
 
 func (bc *BaseContract) SetStub(stub shim.ChaincodeStubInterface) {
