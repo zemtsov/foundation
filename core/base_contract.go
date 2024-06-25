@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -319,7 +320,23 @@ func (bc *BaseContract) IsService() bool {
 func (bc *BaseContract) setupTracing() {
 	serviceName := "chaincode-" + bc.GetID()
 
-	telemetry.InstallTraceProvider(bc.ContractConfig().GetTracingCollectorEndpoint(), serviceName)
+	// Check if the environment variable with the tracing collector endpoint exists
+	endpointFromEnv, ok := os.LookupEnv(telemetry.TracingCollectorEndpointEnv)
+
+	traceConfig := bc.ContractConfig().GetTracingCollectorEndpoint()
+
+	// If the chaincode is not operating as a service or the environment variable with the endpoint
+	// does not exist in the system, use the contract configuration for tracing.
+	if bc.IsService() && ok {
+		traceConfig = &pb.CollectorEndpoint{
+			Endpoint:                 endpointFromEnv,
+			AuthorizationHeaderKey:   os.Getenv(telemetry.TracingCollectorAuthHeaderKey),
+			AuthorizationHeaderValue: os.Getenv(telemetry.TracingCollectorAuthHeaderValue),
+			TlsCa:                    os.Getenv(telemetry.TracingCollectorCaPem),
+		}
+	}
+
+	telemetry.InstallTraceProvider(traceConfig, serviceName)
 
 	th := &telemetry.TracingHandler{}
 	th.Tracer = otel.Tracer(serviceName)
