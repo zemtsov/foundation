@@ -8,7 +8,6 @@ import (
 
 const signatureLength = 64
 
-// Deprecated: use package keys/eth
 // Sign calculates an ECDSA signature using Ethereum crypto functions
 func Sign(digest []byte, privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	const recoveryBits = 27
@@ -23,7 +22,6 @@ func Sign(digest []byte, privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	return signature, nil
 }
 
-// Deprecated: use package keys/eth
 // Verify checks that the given public key created signature over digest
 // using Ethereum crypto functions
 func Verify(publicKey, digest, signature []byte) bool {

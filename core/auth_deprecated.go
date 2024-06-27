@@ -9,9 +9,10 @@ import (
 
 	"github.com/anoideaopen/foundation/core/helpers"
 	"github.com/anoideaopen/foundation/core/types"
+	"github.com/anoideaopen/foundation/keys"
+	pb "github.com/anoideaopen/foundation/proto"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
-	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -31,7 +32,11 @@ func CheckSign(
 	for i := 0; i < signers; i++ {
 		key := base58.Decode(auth[i])
 		sign := base58.Decode(auth[i+signers])
-		if !ed25519.Verify(key, message[:], sign) {
+		valid, err := keys.VerifySignatureByKeyType(pb.KeyType_ed25519, key, message[:], sign)
+		if err != nil {
+			return &types.Address{}, "", fmt.Errorf("error validating signature: %w", err)
+		}
+		if !valid {
 			return &types.Address{}, "", errors.New("incorrect signature")
 		}
 	}
