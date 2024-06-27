@@ -553,7 +553,7 @@ func (cc *Chaincode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 
 	case BatchExecute:
 		defer func() {
-			log.Warningf("tx id: %s, name: %s, elapsed: %d",
+			log.Warningf("tx id: %s, name: %s, elapsed: %s",
 				transactionID,
 				functionName,
 				time.Since(start),
@@ -583,7 +583,7 @@ func (cc *Chaincode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 
 	case ExecuteTasks:
 		defer func() {
-			log.Warningf("tx id: %s, name: %s, elapsed: %d",
+			log.Warningf("tx id: %s, name: %s, elapsed: %s",
 				transactionID,
 				functionName,
 				time.Since(start),
