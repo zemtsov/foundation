@@ -2,7 +2,6 @@ package mock
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/anoideaopen/foundation/core"
 	"github.com/anoideaopen/foundation/proto"
-	proto2 "google.golang.org/protobuf/proto"
+	pb "google.golang.org/protobuf/proto"
 )
 
 type ExecutorRequest struct {
@@ -62,13 +61,13 @@ func (w *Wallet) TaskExecutor(r ExecutorRequest) (*ExecutorResponse, error) {
 		args, _ = w.sign(r.Method, r.Channel, r.Args...)
 	}
 
-	task := core.Task{
-		ID:     strconv.FormatInt(rand.Int63(), 10),
+	task := &proto.Task{
+		Id:     strconv.FormatInt(rand.Int63(), 10),
 		Method: r.Method,
 		Args:   args,
 	}
 
-	bytes, err := json.Marshal(core.ExecuteTasksRequest{Tasks: []core.Task{task}})
+	bytes, err := pb.Marshal(&proto.ExecuteTasksRequest{Tasks: []*proto.Task{task}})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal tasks ExecuteTasksRequest: %w", err)
 	}
@@ -84,17 +83,17 @@ func (w *Wallet) TaskExecutor(r ExecutorRequest) (*ExecutorResponse, error) {
 	}
 
 	var batchResponse proto.BatchResponse
-	err = proto2.Unmarshal(peerResponse.GetPayload(), &batchResponse)
+	err = pb.Unmarshal(peerResponse.GetPayload(), &batchResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal BatchResponse: %w", err)
 	}
 
-	batchTxEvent, err := w.getEventByID(r.Channel, task.ID)
+	batchTxEvent, err := w.getEventByID(r.Channel, task.GetId())
 	if err != nil {
 		return nil, err
 	}
 
-	txResponse, err := getTxResponseByID(&batchResponse, task.ID)
+	txResponse, err := getTxResponseByID(&batchResponse, task.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +112,7 @@ func (w *Wallet) getEventByID(channel string, id string) (*proto.BatchTxEvent, e
 	e := <-w.ledger.stubs[channel].ChaincodeEventsChannel
 	if e.GetEventName() == core.ExecuteTasksEvent {
 		batchEvent := proto.BatchEvent{}
-		err := proto2.Unmarshal(e.GetPayload(), &batchEvent)
+		err := pb.Unmarshal(e.GetPayload(), &batchEvent)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal BatchEvent: %w", err)
 		}
