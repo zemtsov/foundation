@@ -109,11 +109,7 @@ func TasksExecutorHandler(
 func (e *TaskExecutor) ExecuteTasks(
 	traceCtx telemetry.TraceContext,
 	tasks []*proto.Task,
-) (
-	*proto.BatchResponse,
-	*proto.BatchEvent,
-	error,
-) {
+) (*proto.BatchResponse, *proto.BatchEvent, error) {
 	traceCtx, span := e.TracingHandler.StartNewSpan(traceCtx, "TaskExecutor.ExecuteTasks")
 	defer span.End()
 
@@ -136,7 +132,7 @@ func (e *TaskExecutor) ExecuteTasks(
 // validatedTxSenderMethodAndArgs validates the sender, method, and arguments for a transaction.
 func (e *TaskExecutor) validatedTxSenderMethodAndArgs(
 	traceCtx telemetry.TraceContext,
-	batchCacheStub *cachestub.BatchCacheStub,
+	stub *cachestub.BatchCacheStub,
 	task *proto.Task,
 ) (*proto.Address, contract.Method, []string, error) {
 	_, span := e.TracingHandler.StartNewSpan(traceCtx, "TaskExecutor.validatedTxSenderMethodAndArgs")
@@ -151,7 +147,7 @@ func (e *TaskExecutor) validatedTxSenderMethodAndArgs(
 	}
 
 	span.AddEvent("validating and extracting invocation context")
-	senderAddress, args, nonce, err := e.Chaincode.validateAndExtractInvocationContext(batchCacheStub, method, task.GetArgs())
+	senderAddress, args, nonce, err := e.Chaincode.validateAndExtractInvocationContext(stub, method, task.GetArgs())
 	if err != nil {
 		err = fmt.Errorf("failed to validate and extract invocation context for task %s: %w", task.GetId(), err)
 		span.SetStatus(codes.Error, err.Error())
@@ -175,7 +171,7 @@ func (e *TaskExecutor) validatedTxSenderMethodAndArgs(
 
 	span.AddEvent("validating nonce")
 	sender := types.NewSenderFromAddr((*types.Address)(senderAddress))
-	err = checkNonce(batchCacheStub, sender, nonce)
+	err = checkNonce(stub, sender, nonce)
 	if err != nil {
 		err = fmt.Errorf("failed to validate nonce for task %s, nonce %d: %w", task.GetId(), nonce, err)
 		span.SetStatus(codes.Error, err.Error())
@@ -189,7 +185,7 @@ func (e *TaskExecutor) validatedTxSenderMethodAndArgs(
 func (e *TaskExecutor) ExecuteTask(
 	traceCtx telemetry.TraceContext,
 	task *proto.Task,
-	batchCacheStub *cachestub.BatchCacheStub,
+	stub *cachestub.BatchCacheStub,
 ) (*proto.TxResponse, *proto.BatchTxEvent) {
 	traceCtx, span := e.TracingHandler.StartNewSpan(traceCtx, "TaskExecutor.ExecuteTasks")
 	defer span.End()
@@ -203,11 +199,11 @@ func (e *TaskExecutor) ExecuteTask(
 		log.Infof("task method %s task %s elapsed: %s", task.GetMethod(), task.GetId(), time.Since(start))
 	}()
 
-	txCacheStub := batchCacheStub.NewTxCacheStub(task.GetId())
-	e.Chaincode.contract.SetStub(batchCacheStub)
+	e.Chaincode.contract.SetStub(stub)
+	txCacheStub := stub.NewTxCacheStub(task.GetId())
 
 	span.AddEvent("validating tx sender method and args")
-	senderAddress, method, args, err := e.validatedTxSenderMethodAndArgs(traceCtx, batchCacheStub, task)
+	senderAddress, method, args, err := e.validatedTxSenderMethodAndArgs(traceCtx, stub, task)
 	if err != nil {
 		err = fmt.Errorf("failed to validate transaction sender, method, and arguments for task %s: %w", task.GetId(), err)
 		return handleTaskError(span, task, err)
@@ -227,17 +223,10 @@ func (e *TaskExecutor) ExecuteTask(
 	})
 
 	span.SetStatus(codes.Ok, "")
-	return &proto.TxResponse{
-			Id:     []byte(task.GetId()),
-			Method: task.GetMethod(),
-			Writes: writes,
-		},
+	return &proto.TxResponse{Id: []byte(task.GetId()), Method: task.GetMethod(), Writes: writes},
 		&proto.BatchTxEvent{
-			Id:         []byte(task.GetId()),
-			Method:     task.GetMethod(),
-			Accounting: txCacheStub.Accounting,
-			Events:     events,
-			Result:     response,
+			Id: []byte(task.GetId()), Method: task.GetMethod(),
+			Accounting: txCacheStub.Accounting, Events: events, Result: response,
 		}
 }
 
@@ -252,13 +241,6 @@ func handleTaskError(span trace.Span, task *proto.Task, err error) (*proto.TxRes
 	span.SetStatus(codes.Error, err.Error())
 
 	ee := proto.ResponseError{Error: err.Error()}
-	return &proto.TxResponse{
-			Id:     []byte(task.GetId()),
-			Method: task.GetMethod(),
-			Error:  &ee,
-		}, &proto.BatchTxEvent{
-			Id:     []byte(task.GetId()),
-			Method: task.GetMethod(),
-			Error:  &ee,
-		}
+	return &proto.TxResponse{Id: []byte(task.GetId()), Method: task.GetMethod(), Error: &ee},
+		&proto.BatchTxEvent{Id: []byte(task.GetId()), Method: task.GetMethod(), Error: &ee}
 }

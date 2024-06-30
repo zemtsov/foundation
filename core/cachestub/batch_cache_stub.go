@@ -5,15 +5,16 @@ import (
 	"strings"
 
 	"github.com/anoideaopen/foundation/proto"
+	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
 	"github.com/hyperledger/fabric-chaincode-go/shim"
-	pb "github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric-protos-go/peer"
 )
 
 type BatchCacheStub struct {
 	shim.ChaincodeStubInterface
 	batchWriteCache   map[string]*proto.WriteElement
 	batchReadeCache   map[string]*proto.WriteElement
-	invokeResultCache map[string]pb.Response
+	invokeResultCache map[string]peer.Response
 	Swaps             []*proto.Swap
 	MultiSwaps        []*proto.MultiSwap
 }
@@ -23,7 +24,7 @@ func NewBatchCacheStub(stub shim.ChaincodeStubInterface) *BatchCacheStub {
 		ChaincodeStubInterface: stub,
 		batchWriteCache:        make(map[string]*proto.WriteElement),
 		batchReadeCache:        make(map[string]*proto.WriteElement),
-		invokeResultCache:      make(map[string]pb.Response),
+		invokeResultCache:      make(map[string]peer.Response),
 	}
 }
 
@@ -75,7 +76,7 @@ func (bs *BatchCacheStub) DelState(key string) error {
 	return nil
 }
 
-func (bs *BatchCacheStub) InvokeChaincode(chaincodeName string, args [][]byte, channel string) pb.Response {
+func (bs *BatchCacheStub) InvokeChaincode(chaincodeName string, args [][]byte, channel string) peer.Response {
 	keys := []string{channel, chaincodeName}
 	for _, arg := range args {
 		keys = append(keys, string(arg))
@@ -88,7 +89,38 @@ func (bs *BatchCacheStub) InvokeChaincode(chaincodeName string, args [][]byte, c
 
 	resp := bs.ChaincodeStubInterface.InvokeChaincode(chaincodeName, args, channel)
 
-	if resp.GetStatus() == http.StatusOK && len(resp.GetPayload()) != 0 {
+	if resp.GetStatus() == http.StatusOK && len(resp.GetPayload()) != 0 { //nolint:nestif
+		if string(args[0]) == "checkKeys" {
+			func() {
+				addrMsg := &proto.AclResponse{}
+				if err := pb.Unmarshal(resp.GetPayload(), addrMsg); err != nil {
+					return
+				}
+
+				addr := addrMsg.GetAddress().GetAddress().AddrString()
+
+				address, err := pb.Marshal(addrMsg.GetAddress().GetAddress())
+				if err != nil {
+					return
+				}
+				keyCheck := channel + chaincodeName + "checkAddress" + addr
+				bs.invokeResultCache[keyCheck] = peer.Response{
+					Status:  http.StatusOK,
+					Payload: address,
+				}
+
+				accinfo, err := pb.Marshal(addrMsg.GetAccount())
+				if err != nil {
+					return
+				}
+				keyAccInfo := channel + chaincodeName + "getAccountInfo" + addr
+				bs.invokeResultCache[keyAccInfo] = peer.Response{
+					Status:  http.StatusOK,
+					Payload: accinfo,
+				}
+			}()
+		}
+
 		bs.invokeResultCache[key] = resp
 	}
 

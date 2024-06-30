@@ -58,13 +58,6 @@ func (bt *BaseToken) transferFee(
 		return ErrFeeAddressNotConfigured
 	}
 
-	stub := bt.GetStub()
-	fullAdr, err := helpers.GetFullAddress(stub, recipient.String())
-	if err != nil {
-		return err
-	}
-	recipient = (*types.Address)(fullAdr)
-
 	if err := validateFeeConfig(bt.config); err != nil {
 		return fmt.Errorf("validating fee in config: %w", err)
 	}
