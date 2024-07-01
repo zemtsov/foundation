@@ -28,11 +28,11 @@ func CheckSign(
 		return &types.Address{}, "", errors.New("should be signed")
 	}
 
-	message := sha3.Sum256([]byte(fn + strings.Join(append(args, auth[:signers]...), "")))
+	message := []byte(fn + strings.Join(append(args, auth[:signers]...), ""))
 	for i := 0; i < signers; i++ {
 		key := base58.Decode(auth[i])
 		sign := base58.Decode(auth[i+signers])
-		valid, err := keys.VerifySignatureByKeyType(pb.KeyType_ed25519, key, message[:], sign)
+		valid, err := keys.VerifySignatureByKeyType(pb.KeyType_ed25519, key, message, sign)
 		if err != nil {
 			return &types.Address{}, "", fmt.Errorf("error validating signature: %w", err)
 		}
@@ -51,5 +51,6 @@ func CheckSign(
 		return &types.Address{}, "", errors.New(errMsg)
 	}
 
-	return (*types.Address)(acl.GetAddress().GetAddress()), hex.EncodeToString(message[:]), nil
+	hash := sha3.Sum256(message)
+	return (*types.Address)(acl.GetAddress().GetAddress()), hex.EncodeToString(hash[:]), nil
 }
