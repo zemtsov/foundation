@@ -63,6 +63,19 @@ func (th *TracingHandler) ContextFromStub(stub shim.ChaincodeStubInterface) Trac
 	traceCtx.remote = trace.SpanContextFromContext(traceCtx.ctx).IsRemote()
 	traceCtx.remoteCtx = traceCtx.ctx
 
+	// Getting decorators from the peer.
+	decorators := stub.GetDecorations()
+	// Unpacking decorators to carrier map.
+	peerCarrier, err := UnpackTransientMap(decorators)
+	if err != nil {
+		return traceCtx
+	}
+	// Checking if the context from peer is a remote, and replace the current context with it.
+	peerCtx := th.Propagators.Extract(context.Background(), peerCarrier)
+	if trace.SpanContextFromContext(peerCtx).IsRemote() {
+		traceCtx.ctx = peerCtx
+	}
+
 	return traceCtx
 }
 
