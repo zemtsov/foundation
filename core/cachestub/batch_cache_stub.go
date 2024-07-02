@@ -155,6 +155,10 @@ func (bs *BatchCacheStub) insertCacheGetAccountsInfo(
 	skip := make([]int, 0, len(responses))
 
 	for i, arg := range args {
+		if responses[i].GetStatus() != http.StatusOK || len(responses[i].GetPayload()) == 0 {
+			continue
+		}
+
 		var argsTmp []string
 		err = json.Unmarshal(arg, &argsTmp)
 		if err != nil {
