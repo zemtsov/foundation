@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/anoideaopen/foundation/core/cachestub"
-	"github.com/anoideaopen/foundation/core/contract"
+	"github.com/anoideaopen/foundation/core/config"
 	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/mock/stub"
@@ -98,12 +98,12 @@ func TestSaveToBatchWithWrongArgs(t *testing.T) {
 			RobotSKI: fixtures_test.RobotHashedCert,
 		},
 	}
-	config, _ := protojson.Marshal(cfgEtl)
+	cfg, _ := protojson.Marshal(cfgEtl)
 
 	idBytes := [16]byte(uuid.New())
-	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{config})
+	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfg})
 
-	err := contract.Configure(chainCode.contract, mockStub, config)
+	err := config.Configure(chainCode.contract, cfg)
 	require.NoError(t, err)
 
 	mockStub.TxID = testEncodedTxID
@@ -143,12 +143,12 @@ func TestSaveToBatchWithSignedArgs(t *testing.T) {
 			RobotSKI: fixtures_test.RobotHashedCert,
 		},
 	}
-	config, _ := protojson.Marshal(cfgEtl)
+	cfg, _ := protojson.Marshal(cfgEtl)
 
 	idBytes := [16]byte(uuid.New())
-	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{config})
+	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfg})
 
-	err := contract.Configure(chainCode.contract, mockStub, config)
+	err := config.Configure(chainCode.contract, cfg)
 	require.NoError(t, err)
 
 	mockStub.TxID = testEncodedTxID
@@ -156,9 +156,6 @@ func TestSaveToBatchWithSignedArgs(t *testing.T) {
 	mockStub.TxTimestamp = s.timestamp
 
 	batchTimestamp, err := mockStub.GetTxTimestamp()
-	require.NoError(t, err)
-
-	_, err = buildRouter(chainCode.contract)
 	require.NoError(t, err)
 
 	ep, err := chainCode.Method(s.FnName)
@@ -198,25 +195,22 @@ func TestSaveToBatchWithWrongSignedArgs(t *testing.T) {
 			RobotSKI: fixtures_test.RobotHashedCert,
 		},
 	}
-	config, _ := protojson.Marshal(cfgEtl)
+	cfg, _ := protojson.Marshal(cfgEtl)
 
 	idBytes := [16]byte(uuid.New())
-	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{config})
+	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfg})
 
-	err := contract.Configure(chainCode.contract, mockStub, config)
+	err := config.Configure(chainCode.contract, cfg)
 	require.NoError(t, err)
 
 	mockStub.TxID = testEncodedTxID
 	mockStub.MockTransactionStart(testEncodedTxID)
 	mockStub.TxTimestamp = s.timestamp
 
-	_, err = buildRouter(chainCode.contract)
-	require.NoError(t, err)
-
 	ep, err := chainCode.Method(s.FnName)
 	require.NoError(t, err)
 
-	err = chainCode.Router().Check(ep.MethodName, chainCode.PrependSender(ep, sender, wrongArgs)...)
+	err = chainCode.Router().Check(mockStub, ep.MethodName, chainCode.PrependSender(ep, sender, wrongArgs)...)
 	require.EqualError(t, err, "invalid argument value: 'arg0': for type 'int64': validate TxTestFnWithSignedTwoArgs, argument 1")
 }
 
@@ -252,10 +246,7 @@ func TestSaveToBatchWrongFnName(t *testing.T) {
 	}
 	cfgBytes, _ := protojson.Marshal(cfg)
 
-	err = contract.Configure(chainCode.contract, ms, cfgBytes)
-	require.NoError(t, err)
-
-	_, err = buildRouter(chainCode.contract)
+	err = config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
 	_, err = chainCode.Method(s.FnName)
@@ -299,7 +290,7 @@ func SaveAndLoadToBatchTest(t *testing.T, ser *serieBatches, args []string) {
 	rsp := ms.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfgBytes})
 	require.Equal(t, int32(shim.OK), rsp.GetStatus(), rsp.GetMessage())
 
-	err = contract.Configure(chainCode.contract, ms, cfgBytes)
+	err = config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
 	ms.TxID = testEncodedTxID
@@ -309,9 +300,6 @@ func SaveAndLoadToBatchTest(t *testing.T, ser *serieBatches, args []string) {
 	}
 
 	batchTimestamp, err := ms.GetTxTimestamp()
-	require.NoError(t, err)
-
-	_, err = buildRouter(chainCode.contract)
 	require.NoError(t, err)
 
 	ep, err := chainCode.Method(ser.FnName)
@@ -423,16 +411,13 @@ func BatchExecuteTest(t *testing.T, ser *serieBatchExecute, args []string) peer.
 	rsp := ms.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfgBytes})
 	require.Equal(t, int32(shim.OK), rsp.GetStatus())
 
-	err = contract.Configure(chainCode.contract, ms, cfgBytes)
+	err = config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
 	ms.TxID = testEncodedTxID
 	ms.MockTransactionStart(testEncodedTxID)
 
 	batchTimestamp, err := ms.GetTxTimestamp()
-	require.NoError(t, err)
-
-	_, err = buildRouter(chainCode.contract)
 	require.NoError(t, err)
 
 	ep, err := chainCode.Method(testFnWithFiveArgsMethod)
@@ -492,10 +477,7 @@ func TestBatchedTxExecute(t *testing.T) {
 	rsp := ms.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfgBytes})
 	require.Equal(t, int32(shim.OK), rsp.GetStatus())
 
-	err = contract.Configure(chainCode.contract, ms, cfgBytes)
-	require.NoError(t, err)
-
-	_, err = buildRouter(chainCode.contract)
+	err = config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
 	ms.TxID = testEncodedTxID
@@ -505,9 +487,6 @@ func TestBatchedTxExecute(t *testing.T) {
 	ms.MockTransactionStart(testEncodedTxID)
 
 	batchTimestamp, err := ms.GetTxTimestamp()
-	require.NoError(t, err)
-
-	_, err = buildRouter(chainCode.contract)
 	require.NoError(t, err)
 
 	ep, err := chainCode.Method(testFnWithFiveArgsMethod)

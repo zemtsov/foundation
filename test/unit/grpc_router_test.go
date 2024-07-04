@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/anoideaopen/foundation/core"
-	"github.com/anoideaopen/foundation/core/grpc"
+	"github.com/anoideaopen/foundation/core/routing/grpc"
 	"github.com/anoideaopen/foundation/mock"
 	"github.com/anoideaopen/foundation/test/unit/token/proto"
 	"github.com/anoideaopen/foundation/test/unit/token/service"
@@ -37,6 +37,7 @@ func TestGRPCRouter(t *testing.T) {
 	// Create gRPC router.
 	grpcRouter := grpc.NewRouter(grpc.RouterConfig{
 		Fallback: grpc.DefaultReflectxFallback(balanceToken),
+		UseNames: true,
 	})
 
 	// Register gRPC service.
@@ -97,7 +98,6 @@ func TestGRPCRouterWithURLs(t *testing.T) {
 	// Create gRPC router.
 	grpcRouter := grpc.NewRouter(grpc.RouterConfig{
 		Fallback: grpc.DefaultReflectxFallback(balanceToken),
-		UseURLs:  true,
 	})
 
 	// Register gRPC service.
