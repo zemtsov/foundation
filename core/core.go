@@ -546,9 +546,21 @@ func (cc *Chaincode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 		return cc.batchExecuteHandler(traceCtx, stub, creatorSKI, hashedCert, arguments)
 
 	case SwapDone:
+		cc.contract.setEnv(&environment{
+			stub:  stub,
+			trace: traceCtx,
+		})
+		defer cc.contract.delEnv()
+
 		return cc.swapDoneHandler(stub, arguments)
 
 	case MultiSwapDone:
+		cc.contract.setEnv(&environment{
+			stub:  stub,
+			trace: traceCtx,
+		})
+		defer cc.contract.delEnv()
+
 		return cc.multiSwapDoneHandler(stub, cc.contract.ContractConfig().GetSymbol(), arguments)
 
 	case CreateCCTransferTo,
