@@ -13,6 +13,7 @@ import (
 	"github.com/anoideaopen/foundation/core/config"
 	"github.com/anoideaopen/foundation/core/logger"
 	"github.com/anoideaopen/foundation/core/routing"
+	"github.com/anoideaopen/foundation/core/routing/mux"
 	"github.com/anoideaopen/foundation/core/routing/reflectx"
 	"github.com/anoideaopen/foundation/core/stringsx"
 	"github.com/anoideaopen/foundation/core/telemetry"
@@ -96,7 +97,7 @@ type chaincodeOptions struct {
 	SrcFS        *embed.FS           // SrcFS is a file system that contains the source files for the chaincode.
 	TLS          *TLS                // TLS contains the TLS configuration for the chaincode.
 	ConfigMapper config.ConfigMapper // ConfigMapper maps the arguments to a proto.Config instance.
-	Router       routing.Router      // Router for routing contract calls.
+	Routers      []routing.Router    // Routers is a list of routers for the chaincode.
 }
 
 // Chaincode defines the structure for a chaincode instance, with methods,
@@ -144,7 +145,20 @@ func (cc *Chaincode) Method(functionName string) (routing.Method, error) {
 // - ChaincodeOption: a function that sets the router in the chaincode options.
 func WithRouter(router routing.Router) ChaincodeOption {
 	return func(o *chaincodeOptions) error {
-		o.Router = router
+		o.Routers = append(o.Routers, router)
+		return nil
+	}
+}
+
+// WithRouters returns a ChaincodeOption function that sets the router in the chaincode options.
+//
+// Parameters:
+// - router: the contract router to set.
+// Return type:
+// - ChaincodeOption: a function that sets the router in the chaincode options.
+func WithRouters(routers ...routing.Router) ChaincodeOption {
+	return func(o *chaincodeOptions) error {
+		o.Routers = append(o.Routers, routers...)
 		return nil
 	}
 }
@@ -369,14 +383,18 @@ func NewCC(
 	cc.setSrcFs(chOpts.SrcFS)
 
 	// Set up the router.
-	var router routing.Router
-	if chOpts.Router != nil {
-		router = chOpts.Router
+	var (
+		router routing.Router
+		err    error
+	)
+	if len(chOpts.Routers) > 0 {
+		router, err = mux.NewRouter(chOpts.Routers...)
 	} else {
-		var err error
-		if router, err = reflectx.NewRouter(cc); err != nil {
-			return empty, err
-		}
+		router, err = reflectx.NewRouter(cc)
+	}
+
+	if err != nil {
+		return empty, err
 	}
 
 	cc.setRouter(router)
@@ -612,7 +630,7 @@ func (cc *Chaincode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 		var (
 			swapMethods      = []string{"QuerySwapGet", "TxSwapBegin", "TxSwapCancel"}
 			multiSwapMethods = []string{"QueryMultiSwapGet", "TxMultiSwapBegin", "TxMultiSwapCancel"}
-			method           = method.MethodName
+			method           = method.Method
 			opts             = cc.contract.ContractConfig().GetOptions()
 		)
 
@@ -624,7 +642,7 @@ func (cc *Chaincode) Invoke(stub shim.ChaincodeStubInterface) (r peer.Response) 
 	}
 
 	// handle invoke and query methods executed without batch process
-	if method.Type == routing.MethodTypeInvoke || method.Type == routing.MethodTypeQuery {
+	if method.IsInvoke() || method.IsQuery() {
 		span.SetAttributes(telemetry.MethodType(telemetry.MethodNbTx))
 		return cc.noBatchHandler(traceCtx, stub, method, arguments)
 	}
@@ -678,7 +696,7 @@ func (cc *Chaincode) BatchHandler(
 	}
 
 	span.AddEvent("validating arguments")
-	if err = cc.Router().Check(stub, method.MethodName, cc.PrependSender(method, sender, args)...); err != nil {
+	if err = cc.Router().Check(stub, method.Method, cc.PrependSender(method, sender, args)...); err != nil {
 		span.SetStatus(codes.Error, "validating arguments failed")
 		return shim.Error(err.Error())
 	}
@@ -710,7 +728,7 @@ func (cc *Chaincode) noBatchHandler(
 	traceCtx, span := cc.contract.TracingHandler().StartNewSpan(traceCtx, "chaincode.NoBatchHandler")
 	defer span.End()
 
-	if method.Type == routing.MethodTypeQuery {
+	if method.IsQuery() {
 		stub = newQueryStub(stub)
 	}
 
@@ -723,7 +741,7 @@ func (cc *Chaincode) noBatchHandler(
 
 	span.AddEvent("validating arguments")
 
-	if err = cc.Router().Check(stub, method.MethodName, cc.PrependSender(method, sender, args)...); err != nil {
+	if err = cc.Router().Check(stub, method.Method, cc.PrependSender(method, sender, args)...); err != nil {
 		span.SetStatus(codes.Error, "validating arguments failed")
 		return shim.Error(err.Error())
 	}
@@ -892,7 +910,7 @@ func (cc *Chaincode) createIndexHandler(traceCtx telemetry.TraceContext, stub sh
 }
 
 func (cc *Chaincode) PrependSender(method routing.Method, sender *proto.Address, args []string) []string {
-	if method.RequiresAuth {
+	if method.AuthRequired {
 		args = append([]string{sender.AddrString()}, args...)
 	}
 
