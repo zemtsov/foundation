@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anoideaopen/foundation/core/stringsx"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 )
@@ -43,11 +42,11 @@ func NewRouter(contract any) (*Router, error) {
 			return nil, err
 		}
 
-		if _, ok := methodToFunction[h.function]; ok {
+		if _, ok := functionToMethod[h.function]; ok {
 			return nil, fmt.Errorf("%w, method: '%s'", ErrMethodAlreadyDefined, h.function)
 		}
 
-		methodHandler[h.function] = h
+		methodHandler[h.method] = h
 		methodToFunction[h.method] = h.function
 		functionToMethod[h.function] = h.method
 	}
@@ -189,7 +188,7 @@ func newHandler(name string, of any) (handler, error) {
 		return handler{}, fmt.Errorf("%w: %s", ErrInvalidMethodName, name)
 	}
 
-	h.function = stringsx.LowerFirstChar(h.function)
+	h.function = LowerFirstChar(h.function)
 	h.argCount = InputParamCounts(of, name)
 	h.authRequired = IsArgOfType(of, name, 0, &types.Sender{})
 
