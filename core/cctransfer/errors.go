@@ -13,6 +13,7 @@ var (
 	ErrInvalidToken          = errors.New("invalid argument token")
 	ErrInvalidChannel        = errors.New("invalid argument channel to")
 	ErrIDTransferExist       = errors.New("id transfer already exists")
+	ErrIDMultiTransferExist  = errors.New("id multi transfer already exists")
 	ErrTransferCommit        = errors.New("transfer already commit")
 	ErrTransferNotCommit     = errors.New("transfer not commit")
 	ErrUnauthorizedOperation = errors.New("unauthorized operation")
@@ -20,4 +21,5 @@ var (
 	ErrPageSizeLessOrEqZero  = errors.New("page size is less or equal to zero")
 	ErrAdminNotSet           = errors.New("admin is not set in base config")
 	ErrUnauthorisedNotAdmin  = errors.New("unauthorised, sender is not an admin")
+	ErrEmptyTransferItems    = errors.New("nothing to transfer")
 )

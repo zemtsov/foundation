@@ -140,3 +140,134 @@ func DelCCToTransfer(stub shim.ChaincodeStubInterface, idArg string) error {
 	key := CCToTransfer(idArg)
 	return stub.DelState(key)
 }
+
+// LoadCCFromMultiTransfer returns entry by id.
+func LoadCCFromMultiTransfer(stub shim.ChaincodeStubInterface, idArg string) (*pb.CCMultiTransfer, error) {
+	key := CCFromMultiTransfer(idArg)
+	data, err := stub.GetState(key)
+	if err != nil {
+		return nil, err
+	}
+
+	cct := new(pb.CCMultiTransfer)
+	if len(data) == 0 {
+		return nil, ErrNotFound
+	}
+
+	if err = protojson.Unmarshal(data, cct); err != nil {
+		if err = proto.Unmarshal(data, cct); err != nil {
+			return nil, fmt.Errorf("unmarshal: %w", err)
+		}
+	}
+	return cct, nil
+}
+
+// LoadCCFromMultiTransfers returns entries by range.
+func LoadCCFromMultiTransfers(
+	stub shim.ChaincodeStubInterface,
+	startKey, endKey, bookmark string,
+	pageSize int32,
+) (*pb.CCMultiTransfers, error) {
+	iter, meta, err := stub.GetStateByRangeWithPagination(startKey, endKey, pageSize, bookmark)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = iter.Close()
+	}()
+
+	ccts := new(pb.CCMultiTransfers)
+
+	for iter.HasNext() {
+		var kv *queryresult.KV
+		kv, err = iter.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		cct := new(pb.CCMultiTransfer)
+		if err = protojson.Unmarshal(kv.GetValue(), cct); err != nil {
+			if err = proto.Unmarshal(kv.GetValue(), cct); err != nil {
+				return nil, fmt.Errorf("unmarshal: %w", err)
+			}
+		}
+
+		ccts.Ccts = append(ccts.Ccts, cct)
+	}
+
+	if meta != nil {
+		ccts.Bookmark = meta.GetBookmark()
+	}
+
+	return ccts, nil
+}
+
+// SaveCCFromMultiTransfer saves entry.
+func SaveCCFromMultiTransfer(stub shim.ChaincodeStubInterface, cct *pb.CCMultiTransfer) error {
+	if cct == nil {
+		return ErrSaveNilTransfer
+	}
+
+	if cct.GetId() == "" {
+		return ErrEmptyIDTransfer
+	}
+
+	data, err := protojson.MarshalOptions{EmitUnpopulated: true}.Marshal(cct)
+	if err != nil {
+		return err
+	}
+
+	return stub.PutState(CCFromMultiTransfer(cct.GetId()), data)
+}
+
+// DelCCFromMultiTransfer deletes entry.
+func DelCCFromMultiTransfer(stub shim.ChaincodeStubInterface, idArg string) error {
+	key := CCFromMultiTransfer(idArg)
+	return stub.DelState(key)
+}
+
+// LoadCCToMultiTransfer returns entry by id.
+func LoadCCToMultiTransfer(stub shim.ChaincodeStubInterface, idArg string) (*pb.CCMultiTransfer, error) {
+	key := CCToMultiTransfer(idArg)
+	data, err := stub.GetState(key)
+	if err != nil {
+		return nil, err
+	}
+
+	cct := new(pb.CCMultiTransfer)
+	if len(data) == 0 {
+		return nil, ErrNotFound
+	}
+
+	if err = protojson.Unmarshal(data, cct); err != nil {
+		if err = proto.Unmarshal(data, cct); err != nil {
+			return nil, fmt.Errorf("unmarshal: %w", err)
+		}
+	}
+	return cct, nil
+}
+
+// SaveCCToMultiTransfer saves entry.
+func SaveCCToMultiTransfer(stub shim.ChaincodeStubInterface, cct *pb.CCMultiTransfer) error {
+	if cct == nil {
+		return ErrSaveNilTransfer
+	}
+
+	if cct.GetId() == "" {
+		return ErrEmptyIDTransfer
+	}
+
+	data, err := protojson.MarshalOptions{EmitUnpopulated: true}.Marshal(cct)
+	if err != nil {
+		return err
+	}
+
+	return stub.PutState(CCToMultiTransfer(cct.GetId()), data)
+}
+
+// DelCCToMultiTransfer deletes entry.
+func DelCCToMultiTransfer(stub shim.ChaincodeStubInterface, idArg string) error {
+	key := CCToMultiTransfer(idArg)
+	return stub.DelState(key)
+}

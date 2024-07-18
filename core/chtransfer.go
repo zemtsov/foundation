@@ -38,7 +38,7 @@ func (t typeOperation) String() string {
 }
 
 // TxChannelTransferByCustomer - transaction initiating transfer between channels.
-// The owner of tokens signs. Tokens are transferred to themselveselves.
+// The owner of tokens signs. Tokens are transferred to themselves.
 // After the checks, a transfer record is created and the user's balances are reduced.
 func (bc *BaseContract) TxChannelTransferByCustomer(
 	sender *types.Sender,

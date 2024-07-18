@@ -227,6 +227,25 @@ func (l *Ledger) WaitChTransferTo(name string, id string, timeout time.Duration)
 	require.Fail(l.t, "timeout exceeded")
 }
 
+// WaitChMultiTransferTo waits for transfer to event
+func (l *Ledger) WaitChMultiTransferTo(name string, id string, timeout time.Duration) {
+	interval := time.Second / 2 //nolint:gomnd
+	ticker := time.NewTicker(interval)
+	count := timeout.Microseconds() / interval.Microseconds()
+	key := cctransfer.CCToMultiTransfer(id)
+	for count > 0 {
+		count--
+		<-ticker.C
+		if _, exists := l.stubs[name].State[key]; exists {
+			return
+		}
+	}
+	for k, v := range l.stubs[name].State {
+		fmt.Println(k, string(v))
+	}
+	require.Fail(l.t, "timeout exceeded")
+}
+
 func (l *Ledger) doInvoke(ch, txID, fn string, args ...string) string {
 	resp, err := l.doInvokeWithPeerResponse(ch, txID, fn, args...)
 	require.NoError(l.t, err)
