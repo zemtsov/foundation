@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/anoideaopen/foundation/proto"
+	"github.com/anoideaopen/foundation/core"
+	"github.com/anoideaopen/foundation/core/types/big"
 	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/test/integration/cmn"
 	"github.com/anoideaopen/foundation/test/integration/cmn/client"
@@ -208,6 +210,7 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			emitAmount           = "1000"
 			id                   string
 			id2                  string
+			transferItems        []core.TransferItem
 		)
 
 		BeforeEach(func() {
@@ -232,6 +235,42 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
 				fabricnetwork.CheckResult(fabricnetwork.CheckBalance(emitAmount), nil),
 				"balanceOf", user1.AddressBase58Check)
+
+			By("initialize industrial")
+			client.NBTxInvokeWithSign(network, peer, network.Orderers[0], nil, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+				admin, "initialize", "", client.NewNonceByTime().Get())
+
+			transferItems = []core.TransferItem{
+				{
+					Token:  "INDUSTRIAL_202009",
+					Amount: big.NewInt(10000000000000),
+				},
+				{
+					Token:  "INDUSTRIAL_202010",
+					Amount: big.NewInt(100000000000000),
+				},
+				{
+					Token:  "INDUSTRIAL_202011",
+					Amount: big.NewInt(200000000000000),
+				},
+				{
+					Token:  "INDUSTRIAL_202012",
+					Amount: big.NewInt(50000000000000),
+				},
+			}
+
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, item.Amount.String()), nil),
+					"industrialBalanceOf", admin.AddressBase58Check)
+				client.TxInvokeWithSign(network, peer, network.Orderers[0], cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					admin, "transferIndustrial", "", client.NewNonceByTime().Get(), nil,
+					user1.AddressBase58Check, group, item.Amount.String(), "comment")
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, item.Amount.String()), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
 		})
 
 		It("by customer success", func() {
@@ -660,7 +699,7 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			bookmark := ""
 			By("checking size")
 			fSize := func(out []byte) string {
-				resp := proto.CCTransfers{}
+				resp := pbfound.CCTransfers{}
 				err := json.Unmarshal(out, &resp)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.Bookmark).ToNot(BeEmpty())
@@ -675,7 +714,7 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("checking size")
 			bookmark = ""
 			fCheckIds := func(out []byte) string {
-				resp := proto.CCTransfers{}
+				resp := pbfound.CCTransfers{}
 				err := json.Unmarshal(out, &resp)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.Bookmark).To(BeEmpty())
@@ -694,7 +733,7 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			bookmark = ""
 			for {
 				fCheckBookmark := func(out []byte) string {
-					resp := proto.CCTransfers{}
+					resp := pbfound.CCTransfers{}
 					err := json.Unmarshal(out, &resp)
 					Expect(err).NotTo(HaveOccurred())
 					bookmark = resp.Bookmark
@@ -711,6 +750,356 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				}
 
 				count++
+			}
+		})
+
+		It("multi transfer by customer success", func() {
+			By("FORWARD")
+
+			By("FORWARD. channel transfer by customer forward")
+			forwardItemsJSON, err := json.Marshal(transferItems)
+			Expect(err).NotTo(HaveOccurred())
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, user1, "channelMultiTransferByCustomer", "",
+				client.NewNonceByTime().Get(), nil, id, "CC", string(forwardItemsJSON))
+
+			By("FORWARD. check industrial balance after channelMultiTransferByCustomer")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("FORWARD. check cc allowed balance after channelMultiTransferByCustomer")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("FORWARD. get channel transfer from")
+			from := ""
+			fChTrFrom := func(out []byte) string {
+				if len(out) == 0 {
+					return "out is empty"
+				}
+				from = string(out)
+				return ""
+			}
+			client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial, fabricnetwork.CheckResult(fChTrFrom, nil),
+				"channelTransferFrom", id)
+			Expect(from).NotTo(BeEmpty())
+
+			By("FORWARD. create cc transfer to")
+			client.TxInvokeByRobot(network, peer, network.Orderers[0],
+				cmn.ChannelCC, cmn.ChannelCC, nil, "createCCTransferTo", from)
+
+			By("FORWARD. check industrial balance after createCCTransferTo")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("FORWARD. check cc allowed balance after createCCTransferTo")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(item.Amount.String()), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("FORWARD. channel transfer to")
+			fChTrTo := func(out []byte) string {
+				if len(out) == 0 {
+					return "out is empty"
+				}
+
+				return ""
+			}
+			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC, fabricnetwork.CheckResult(fChTrTo, nil),
+				"channelTransferTo", id)
+
+			By("FORWARD. commit cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "commitCCTransferFrom", id)
+
+			By("FORWARD. delete cc transfer to")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferTo", id)
+
+			By("FORWARD. delete cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferFrom", id)
+
+			By("FORWARD. check cc allowed balance after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(item.Amount.String()), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("FORWARD. check industrial balance after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("BACKWARD")
+
+			By("BACKWARD. channel transfer by customer backward")
+			backwardItemsJSON, err := json.Marshal(transferItems)
+			Expect(err).NotTo(HaveOccurred())
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelCC, cmn.ChannelCC, user1, "channelMultiTransferByCustomer", "",
+				client.NewNonceByTime().Get(), nil, id2, "INDUSTRIAL", string(backwardItemsJSON))
+
+			By("BACKWARD. check cc allowed balance after channelMultiTransferByCustomer")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("BACKWARD. check industrial balance after channelMultiTransferByCustomer")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("BACKWARD. get channel transfer from")
+			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC, fabricnetwork.CheckResult(fChTrFrom, nil),
+				"channelTransferFrom", id2)
+			Expect(from).NotTo(BeEmpty())
+
+			By("BACKWARD. create cc transfer to")
+			client.TxInvokeByRobot(network, peer, network.Orderers[0],
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, nil, "createCCTransferTo", from)
+
+			By("BACKWARD. check industrial allowed balance after createCCTransferTo")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, item.Amount.String()), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+			By("BACKWARD. check cc allowed balance after createCCTransferTo")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("BACKWARD. channel transfer to")
+			client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial, fabricnetwork.CheckResult(fChTrTo, nil),
+				"channelTransferTo", id2)
+
+			By("BACKWARD. commit cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "commitCCTransferFrom", id2)
+
+			By("BACKWARD. delete cc transfer to")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferTo", id2)
+
+			By("BACKWARD. delete cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferFrom", id2)
+
+			By("BACKWARD. check cc allowed balance after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("BACKWARD. check industrial balance after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, item.Amount.String()), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+		})
+
+		It("multi transfer by admin success", func() {
+			By("FORWARD")
+
+			By("FORWARD. channel transfer forward")
+			forwardItemsJSON, err := json.Marshal(transferItems)
+			Expect(err).NotTo(HaveOccurred())
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, admin, "channelMultiTransferByAdmin", "",
+				client.NewNonceByTime().Get(), nil, id, "CC", user1.AddressBase58Check, string(forwardItemsJSON))
+
+			By("FORWARD. check industrial balance after channelMultiTransferByAdmin")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("FORWARD. check cc allowed balance after channelMultiTransferByAdmin")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("FORWARD. get channel transfer from")
+			from := ""
+			fChTrFrom := func(out []byte) string {
+				if len(out) == 0 {
+					return "out is empty"
+				}
+				from = string(out)
+
+				return ""
+			}
+			client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial, fabricnetwork.CheckResult(fChTrFrom, nil),
+				"channelTransferFrom", id)
+			Expect(from).NotTo(BeEmpty())
+
+			By("FORWARD. create cc transfer to")
+			client.TxInvokeByRobot(network, peer, network.Orderers[0],
+				cmn.ChannelCC, cmn.ChannelCC, nil, "createCCTransferTo", from)
+
+			By("FORWARD. check industrial balance after createCCTransferTo")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("FORWARD. check cc allowed after createCCTransferTo")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(item.Amount.String()), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("FORWARD. channel transfer to")
+			fChTrTo := func(out []byte) string {
+				if len(out) == 0 {
+					return "out is empty"
+				}
+
+				return ""
+			}
+			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC, fabricnetwork.CheckResult(fChTrTo, nil),
+				"channelTransferTo", id)
+
+			By("FORWARD. commit cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "commitCCTransferFrom", id)
+
+			By("FORWARD. delete cc transfer to")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferTo", id)
+
+			By("FORWARD. delete cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferFrom", id)
+
+			By("FORWARD. check cc allowed balance. after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance(item.Amount.String()), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("FORWARD. check industrial allowed balance. after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("BACKWARD")
+
+			By("BACKWARD. channel transfer by customer backward")
+			backwardItemsJSON, err := json.Marshal(transferItems)
+			Expect(err).NotTo(HaveOccurred())
+			client.TxInvokeWithSign(network, peer, network.Orderers[0],
+				cmn.ChannelCC, cmn.ChannelCC, admin, "channelMultiTransferByAdmin", "",
+				client.NewNonceByTime().Get(), nil, id2, "INDUSTRIAL", user1.AddressBase58Check, string(backwardItemsJSON))
+
+			By("BACKWARD. check cc allowed balance after channelMultiTransferByAdmin")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("BACKWARD. check industrial balance after channelMultiTransferByAdmin")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, "0"), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("BACKWARD. get channel transfer from")
+			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC, fabricnetwork.CheckResult(fChTrFrom, nil),
+				"channelTransferFrom", id2)
+			Expect(from).NotTo(BeEmpty())
+
+			By("BACKWARD. create cc transfer to")
+			client.TxInvokeByRobot(network, peer, network.Orderers[0],
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, nil, "createCCTransferTo", from)
+
+			By("BACKWARD. check cc balance after createCCTransferTo")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("BACKWARD. check industrial balance after createCCTransferTo")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, item.Amount.String()), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
+			}
+
+			By("BACKWARD. channel transfer to")
+			client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial, fabricnetwork.CheckResult(fChTrTo, nil),
+				"channelTransferTo", id2)
+
+			By("BACKWARD. commit cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "commitCCTransferFrom", id2)
+
+			By("BACKWARD. delete cc transfer to")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferTo", id2)
+
+			By("BACKWARD. delete cc transfer from")
+			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferFrom", id2)
+
+			By("BACKWARD. check cc allowed balance after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
+					fabricnetwork.CheckResult(fabricnetwork.CheckBalance("0"), nil),
+					"allowedBalanceOf", user1.AddressBase58Check, item.Token)
+			}
+
+			By("BACKWARD. check industrial balance after deleteCCTransferFrom")
+			for _, item := range transferItems {
+				group := strings.Split(item.Token, "_")[1]
+				client.Query(network, peer, cmn.ChannelIndustrial, cmn.ChannelIndustrial,
+					fabricnetwork.CheckResult(fabricnetwork.CheckIndustrialBalance(group, item.Amount.String()), nil),
+					"industrialBalanceOf", user1.AddressBase58Check)
 			}
 		})
 	})
