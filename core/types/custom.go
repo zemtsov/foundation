@@ -62,7 +62,7 @@ func (a *Address) Empty() bool {
 
 // String returns address string
 func (a *Address) String() string {
-	if a.Address == nil {
+	if a.Empty() {
 		return ""
 	}
 	return base58.CheckEncode(a.Address[1:], a.Address[0])
