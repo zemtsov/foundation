@@ -1,6 +1,7 @@
 package balance
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/hyperledger/fabric-chaincode-go/shim"
@@ -9,6 +10,8 @@ import (
 // InverseBalanceObjectType is designed for indexing the inverse balance values to retrieve
 // a list of token owners.
 const InverseBalanceObjectType = "inverse_balance"
+
+var ErrAddressMustNotBeEmpty = errors.New("address must not be empty")
 
 // Get retrieves the balance value for the given address and token, constructing the appropriate composite key.
 //
@@ -27,6 +30,10 @@ func Get(
 	address string,
 	token string,
 ) (*big.Int, error) {
+	if address == "" {
+		return nil, ErrAddressMustNotBeEmpty
+	}
+
 	// Construct the composite key based on the address and, if provided, the token.
 	compositeKeyAttributes := []string{address}
 	if token != "" {
@@ -67,6 +74,10 @@ func Put(
 	token string,
 	value *big.Int,
 ) error {
+	if address == "" {
+		return ErrAddressMustNotBeEmpty
+	}
+
 	// Create the primary composite key for the balance entry.
 	primaryAttributes := []string{address}
 	if token != "" {
