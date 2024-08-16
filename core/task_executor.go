@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
@@ -11,12 +12,14 @@ import (
 	"github.com/anoideaopen/foundation/core/logger"
 	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/core/types"
+	"github.com/anoideaopen/foundation/hlfcreator"
 	"github.com/anoideaopen/foundation/proto"
 	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const ExecuteTasksEvent = "executeTasks"
@@ -47,6 +50,8 @@ func TasksExecutorHandler(
 	traceCtx telemetry.TraceContext,
 	stub shim.ChaincodeStubInterface,
 	cc *Chaincode,
+	creatorSKI [32]byte,
+	hashedCert [32]byte,
 ) ([]byte, error) {
 	tracingHandler := cc.contract.TracingHandler()
 	traceCtx, span := tracingHandler.StartNewSpan(traceCtx, ExecuteTasks)
@@ -60,6 +65,13 @@ func TasksExecutorHandler(
 		log.Infof("tasks executor: tx id: %s, elapsed: %s", txID, time.Since(start))
 	}()
 
+	robotSKIBytes, _ := hex.DecodeString(cc.contract.ContractConfig().GetRobotSKI())
+
+	err := hlfcreator.ValidateSKI(robotSKIBytes, creatorSKI, hashedCert)
+	if err != nil {
+		return nil, fmt.Errorf("unauthorized: robotSKI is not equal creatorSKI and hashedCert: %w", err)
+	}
+
 	_, args := stub.GetFunctionAndParameters()
 
 	if len(args) != 1 {
@@ -68,7 +80,7 @@ func TasksExecutorHandler(
 	}
 
 	var executeTaskRequest proto.ExecuteTasksRequest
-	if err := pb.Unmarshal([]byte(args[0]), &executeTaskRequest); err != nil {
+	if err := unmarshalExecuteTaskRequest([]byte(args[0]), &executeTaskRequest); err != nil {
 		err = fmt.Errorf("failed to unmarshal argument to ExecuteTasksRequest for transaction %s, argument: %s", txID, args[0])
 		return nil, handleTasksError(span, err)
 	}
@@ -103,6 +115,17 @@ func TasksExecutorHandler(
 	}
 
 	return data, nil
+}
+
+// unmarshalExecuteTaskRequest try to unmarshal proto and if failed unmarshal protojson
+func unmarshalExecuteTaskRequest(data []byte, executeTaskRequest *proto.ExecuteTasksRequest) error {
+	if err := pb.Unmarshal(data, executeTaskRequest); err != nil {
+		// If standard protobuf unmarshalling fails, try JSON format
+		if err := protojson.Unmarshal(data, executeTaskRequest); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ExecuteTasks processes a group of tasks, returning a group response and event.
