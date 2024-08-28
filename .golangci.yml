@@ -67,7 +67,6 @@ linters:
     - fatcontext
 #    - spancheck
 #    - intrange # (Go 1.22+)
-#    - copyloopvar # (Go 1.22+)
   disable:
     - godot
     - wsl
