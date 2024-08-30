@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/anoideaopen/foundation/core"
-	"github.com/anoideaopen/foundation/proto"
+	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/test/integration/cmn"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/hyperledger/fabric/integration/nwo"
@@ -20,15 +20,15 @@ func newTaskID() string {
 	return time.Now().UTC().Format(time.RFC3339Nano)
 }
 
-func CreateTask(method string, args ...string) *proto.Task {
-	return &proto.Task{
+func createTask(method string, args ...string) *pbfound.Task {
+	return &pbfound.Task{
 		Id:     newTaskID(),
 		Method: method,
 		Args:   args,
 	}
 }
 
-func CreateTaskWithSignArgs(method string, channel string, chaincode string, user *UserFoundation, args ...string) (*proto.Task, error) {
+func CreateTaskWithSignArgs(method string, channel string, chaincode string, user *UserFoundation, args ...string) (*pbfound.Task, error) {
 	requestID := time.Now().UTC().Format(time.RFC3339Nano)
 
 	args = append(append([]string{method, requestID, channel, chaincode}, args...), NewNonceByTime().Get())
@@ -40,56 +40,21 @@ func CreateTaskWithSignArgs(method string, channel string, chaincode string, use
 
 	args = append(args, pubKey, base58.Encode(sMsg))
 
-	task := &proto.Task{
-		Id:     newTaskID(),
-		Method: method,
-		Args:   args[1:], // Exclude the method name from the args
-	}
+	task := createTask(method, args[1:]...) // Exclude the method name from the args
 
 	return task, nil
 }
 
-func ExecuteTaskWithSign(
-	network *nwo.Network,
-	channel string,
-	chaincode string,
-	user *UserFoundation,
-	checkErr CheckResultFunc,
-	method string,
-	args ...string,
-) string {
-	task, err := CreateTaskWithSignArgs(method, channel, chaincode, user, args...)
-	if err != nil {
-		panic(err)
-	}
-	txID := ExecuteTasks(network, network.Peers[0], network.Orderers[0], checkErr, channel, chaincode, task)
-	return txID
-}
-
-func ExecuteTask(
-	network *nwo.Network,
-	peer *nwo.Peer,
-	orderer *nwo.Orderer,
-	checkErr CheckResultFunc,
-	channel string,
-	chaincode string,
-	method string,
-	args ...string,
-) string {
-	task := CreateTask(method, args...)
-	return ExecuteTasks(network, peer, orderer, checkErr, channel, chaincode, task)
-}
-
-func ExecuteTasks(
+func executeTasks(
 	network *nwo.Network,
 	peer *nwo.Peer,
 	orderer *nwo.Orderer,
 	checkErr CheckResultFunc,
 	channel string,
 	ccName string,
-	tasks ...*proto.Task,
+	tasks ...*pbfound.Task,
 ) string {
-	bytes, err := protojson.Marshal(&proto.ExecuteTasksRequest{Tasks: tasks})
+	bytes, err := protojson.Marshal(&pbfound.ExecuteTasksRequest{Tasks: tasks})
 	Expect(err).NotTo(HaveOccurred())
 
 	sess, err := network.PeerUserSession(peer, "User2", commands.ChaincodeInvoke{

@@ -322,3 +322,29 @@ func (ts *testSuite) StopOrderers() {
 	ts.ordererProcesses = nil
 	ts.ordererRunners = nil
 }
+
+func (ts *testSuite) ExecuteTask(channel string, chaincode string, method string, args ...string) string {
+	task := createTask(method, args...)
+	return ts.ExecuteTasks(channel, chaincode, task)
+}
+
+func (ts *testSuite) ExecuteTasks(channel string, chaincode string, tasks ...*pbfound.Task) string {
+	return executeTasks(
+		ts.network,
+		ts.peer,
+		ts.orderer,
+		nil,
+		channel,
+		chaincode,
+		tasks...,
+	)
+}
+
+func (ts *testSuite) ExecuteTaskWithSign(channel string, chaincode string, user *UserFoundation, method string, args ...string) string {
+	task, err := CreateTaskWithSignArgs(method, channel, chaincode, user, args...)
+	if err != nil {
+		panic(err)
+	}
+
+	return ts.ExecuteTasks(channel, chaincode, task)
+}

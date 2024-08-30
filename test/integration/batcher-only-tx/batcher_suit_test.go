@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hyperledger/fabric/integration"
 	"github.com/hyperledger/fabric/integration/nwo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,7 +39,3 @@ var _ = SynchronizedAfterSuite(func() {
 }, func() {
 	buildServer.Shutdown()
 })
-
-func StartPort() int {
-	return integration.IdemixBasePort.StartPortForNode()
-}
