@@ -2,6 +2,8 @@ package channel_transfer_only_tx
 
 import (
 	"encoding/json"
+	"strings"
+
 	"github.com/anoideaopen/foundation/core"
 	"github.com/anoideaopen/foundation/core/types/big"
 	pbfound "github.com/anoideaopen/foundation/proto"
@@ -11,7 +13,6 @@ import (
 	"github.com/hyperledger/fabric/integration"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"strings"
 )
 
 var _ = Describe("Channel transfer only tx foundation Tests", func() {
@@ -261,7 +262,7 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 
 			By("BACKWARD")
 
-			By("channel transfer by customer backward")
+			By("channel transfer by admin backward")
 			ts.TxInvokeWithSign(cmn.ChannelCC, cmn.ChannelCC, ts.Admin(), "channelTransferByAdmin", "",
 				client.NewNonceByTime().Get(), id2, "FIAT", user1.AddressBase58Check, "FIAT", transferAmount).CheckErrorIsNil()
 
