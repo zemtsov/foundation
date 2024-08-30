@@ -16,6 +16,18 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+func newTaskID() string {
+	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+func CreateTask(method string, args ...string) *proto.Task {
+	return &proto.Task{
+		Id:     newTaskID(),
+		Method: method,
+		Args:   args,
+	}
+}
+
 func CreateTaskWithSignArgs(method string, channel string, chaincode string, user *UserFoundation, args ...string) (*proto.Task, error) {
 	requestID := time.Now().UTC().Format(time.RFC3339Nano)
 
@@ -28,9 +40,8 @@ func CreateTaskWithSignArgs(method string, channel string, chaincode string, use
 
 	args = append(args, pubKey, base58.Encode(sMsg))
 
-	taskID := time.Now().UTC().Format(time.RFC3339Nano)
 	task := &proto.Task{
-		Id:     taskID,
+		Id:     newTaskID(),
 		Method: method,
 		Args:   args[1:], // Exclude the method name from the args
 	}
@@ -51,15 +62,28 @@ func ExecuteTaskWithSign(
 	if err != nil {
 		panic(err)
 	}
-	txID := ExecuteTasks(network, network.Peers[0], network.Orderers[0], "User2", checkErr, channel, chaincode, task)
+	txID := ExecuteTasks(network, network.Peers[0], network.Orderers[0], checkErr, channel, chaincode, task)
 	return txID
+}
+
+func ExecuteTask(
+	network *nwo.Network,
+	peer *nwo.Peer,
+	orderer *nwo.Orderer,
+	checkErr CheckResultFunc,
+	channel string,
+	chaincode string,
+	method string,
+	args ...string,
+) string {
+	task := CreateTask(method, args...)
+	return ExecuteTasks(network, peer, orderer, checkErr, channel, chaincode, task)
 }
 
 func ExecuteTasks(
 	network *nwo.Network,
 	peer *nwo.Peer,
 	orderer *nwo.Orderer,
-	userOrg string,
 	checkErr CheckResultFunc,
 	channel string,
 	ccName string,
@@ -68,7 +92,7 @@ func ExecuteTasks(
 	bytes, err := protojson.Marshal(&proto.ExecuteTasksRequest{Tasks: tasks})
 	Expect(err).NotTo(HaveOccurred())
 
-	sess, err := network.PeerUserSession(peer, userOrg, commands.ChaincodeInvoke{
+	sess, err := network.PeerUserSession(peer, "User2", commands.ChaincodeInvoke{
 		ChannelID: channel,
 		Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
 		Name:      ccName,

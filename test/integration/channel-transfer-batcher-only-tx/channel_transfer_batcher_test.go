@@ -1,4 +1,4 @@
-package channel_transfer_only_tx
+package channel_transfer_batcher_only_tx
 
 import (
 	"encoding/json"
@@ -277,9 +277,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("FORWARD")
 
 			By("channel transfer by customer forward")
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat,
+				user1, nil, "channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 
 			By("check balance after transfer")
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -300,8 +299,9 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, nil, "createCCTransferTo", from)
+
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "createCCTransferTo", from)
 
 			By("check allowed balance 1")
 			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
@@ -320,15 +320,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id)
 
 			By("commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "commitCCTransferFrom", id)
 
 			By("delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferTo", id)
 
 			By("delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "deleteCCTransferFrom", id)
 
 			By("check allowed balance 2")
@@ -359,8 +359,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelFiat, cmn.ChannelFiat, "createCCTransferTo", from)
 
 			By("check fiat balance 1")
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -372,15 +372,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id2)
 
 			By("commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "commitCCTransferFrom", id2)
 
 			By("delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "deleteCCTransferTo", id2)
 
 			By("delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferFrom", id2)
 
 			By("check allowed balance")
@@ -398,9 +398,9 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("FORWARD")
 
 			By("channel transfer forward")
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, admin, "channelTransferByAdmin", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", user1.AddressBase58Check, "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat,
+				admin, nil, "channelTransferByAdmin",
+				id, "CC", user1.AddressBase58Check, "FIAT", transferAmount)
 
 			By("check balance after transfer")
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -422,8 +422,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "createCCTransferTo", from)
 
 			By("check allowed balance 1")
 			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
@@ -442,15 +442,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id)
 
 			By("commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "commitCCTransferFrom", id)
 
 			By("delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferTo", id)
 
 			By("delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "deleteCCTransferFrom", id)
 
 			By("check allowed balance 2")
@@ -466,9 +466,9 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("BACKWARD")
 
 			By("channel transfer by admin backward")
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, admin, "channelTransferByAdmin", "",
-				client.NewNonceByTime().Get(), nil, id2, "FIAT", user1.AddressBase58Check, "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelCC, cmn.ChannelCC, admin,
+				nil, "channelTransferByAdmin",
+				id2, "FIAT", user1.AddressBase58Check, "FIAT", transferAmount)
 
 			By("check allowed balance after transfer")
 			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
@@ -481,8 +481,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelFiat, cmn.ChannelFiat, "createCCTransferTo", from)
 
 			By("check fiat balance 1")
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -494,15 +494,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id2)
 
 			By("commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "commitCCTransferFrom", id2)
 
 			By("delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "deleteCCTransferTo", id2)
 
 			By("delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferFrom", id2)
 
 			By("check allowed balance")
@@ -518,9 +518,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 
 		It("cancel forward success", func() {
 			By("cancel channel transfer forward")
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat, user1, nil,
+				"channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 
 			By("check balance after transfer")
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -539,7 +538,7 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferFrom", id)
 
 			By("cancel cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "cancelCCTransferFrom", id)
 
 			By("check allowed balance 2")
@@ -557,9 +556,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("FORWARD")
 
 			By("channel transfer by customer forward")
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat, user1, nil,
+				"channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 
 			By("check balance after transfer")
 			client.Query(network, peer, cmn.ChannelFiat, cmn.ChannelFiat,
@@ -580,8 +578,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "createCCTransferTo", from)
 
 			By("check allowed balance 1")
 			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
@@ -600,15 +598,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id)
 
 			By("commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "commitCCTransferFrom", id)
 
 			By("delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferTo", id)
 
 			By("delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelFiat, cmn.ChannelFiat, "deleteCCTransferFrom", id)
 
 			By("check allowed balance 2")
@@ -624,9 +622,9 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("BACKWARD")
 
 			By("channel transfer by customer backward")
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id2, "FIAT", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelCC, cmn.ChannelCC, user1,
+				nil, "channelTransferByCustomer",
+				id2, "FIAT", "FIAT", transferAmount)
 
 			By("check allowed balance after transfer")
 			client.Query(network, peer, cmn.ChannelCC, cmn.ChannelCC,
@@ -638,7 +636,7 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				fabricnetwork.CheckResult(fChTrTo, nil), "channelTransferFrom", id2)
 
 			By("cancel cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "cancelCCTransferFrom", id2)
 
 			By("check allowed balance 2")
@@ -658,37 +656,32 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 
 			By("channel transfer by customer forward1")
 			id = uuid.NewString()
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat, user1, nil,
+				"channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 			ids[id] = struct{}{}
 
 			By("channel transfer by customer forward2")
 			id = uuid.NewString()
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat, user1, nil,
+				"channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 			ids[id] = struct{}{}
 
 			By("channel transfer by customer forward3")
 			id = uuid.NewString()
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat, user1, nil,
+				"channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 			ids[id] = struct{}{}
 
 			By("channel transfer by customer forward4")
 			id = uuid.NewString()
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat, user1, nil,
+				"channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 			ids[id] = struct{}{}
 
 			By("channel transfer by customer forward5")
 			id = uuid.NewString()
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelFiat, cmn.ChannelFiat, user1, "channelTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", "FIAT", transferAmount)
+			client.ExecuteTaskWithSign(network, cmn.ChannelFiat, cmn.ChannelFiat, user1, nil,
+				"channelTransferByCustomer", id, "CC", "FIAT", transferAmount)
 			ids[id] = struct{}{}
 
 			By("check balance after transfer")
@@ -759,9 +752,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("FORWARD. channel transfer by customer forward")
 			forwardItemsJSON, err := json.Marshal(transferItems)
 			Expect(err).NotTo(HaveOccurred())
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelIndustrial, cmn.ChannelIndustrial, user1, "channelMultiTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", string(forwardItemsJSON))
+			client.ExecuteTaskWithSign(network, cmn.ChannelIndustrial, cmn.ChannelIndustrial, user1, nil,
+				"channelMultiTransferByCustomer", id, "CC", string(forwardItemsJSON))
 
 			By("FORWARD. check industrial balance after channelMultiTransferByCustomer")
 			for _, item := range transferItems {
@@ -792,8 +784,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("FORWARD. create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "createCCTransferTo", from)
 
 			By("FORWARD. check industrial balance after createCCTransferTo")
 			for _, item := range transferItems {
@@ -822,15 +814,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id)
 
 			By("FORWARD. commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "commitCCTransferFrom", id)
 
 			By("FORWARD. delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferTo", id)
 
 			By("FORWARD. delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferFrom", id)
 
 			By("FORWARD. check cc allowed balance after deleteCCTransferFrom")
@@ -853,9 +845,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("BACKWARD. channel transfer by customer backward")
 			backwardItemsJSON, err := json.Marshal(transferItems)
 			Expect(err).NotTo(HaveOccurred())
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, user1, "channelMultiTransferByCustomer", "",
-				client.NewNonceByTime().Get(), nil, id2, "INDUSTRIAL", string(backwardItemsJSON))
+			client.ExecuteTaskWithSign(network, cmn.ChannelCC, cmn.ChannelCC, user1, nil,
+				"channelMultiTransferByCustomer", id2, "INDUSTRIAL", string(backwardItemsJSON))
 
 			By("BACKWARD. check cc allowed balance after channelMultiTransferByCustomer")
 			for _, item := range transferItems {
@@ -878,8 +869,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("BACKWARD. create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelIndustrial, cmn.ChannelIndustrial, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "createCCTransferTo", from)
 
 			By("BACKWARD. check industrial allowed balance after createCCTransferTo")
 			for _, item := range transferItems {
@@ -900,15 +891,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id2)
 
 			By("BACKWARD. commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "commitCCTransferFrom", id2)
 
 			By("BACKWARD. delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferTo", id2)
 
 			By("BACKWARD. delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferFrom", id2)
 
 			By("BACKWARD. check cc allowed balance after deleteCCTransferFrom")
@@ -933,9 +924,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("FORWARD. channel transfer forward")
 			forwardItemsJSON, err := json.Marshal(transferItems)
 			Expect(err).NotTo(HaveOccurred())
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelIndustrial, cmn.ChannelIndustrial, admin, "channelMultiTransferByAdmin", "",
-				client.NewNonceByTime().Get(), nil, id, "CC", user1.AddressBase58Check, string(forwardItemsJSON))
+			client.ExecuteTaskWithSign(network, cmn.ChannelIndustrial, cmn.ChannelIndustrial, admin, nil,
+				"channelMultiTransferByAdmin", id, "CC", user1.AddressBase58Check, string(forwardItemsJSON))
 
 			By("FORWARD. check industrial balance after channelMultiTransferByAdmin")
 			for _, item := range transferItems {
@@ -967,8 +957,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("FORWARD. create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelCC, cmn.ChannelCC, "createCCTransferTo", from)
 
 			By("FORWARD. check industrial balance after createCCTransferTo")
 			for _, item := range transferItems {
@@ -997,15 +987,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id)
 
 			By("FORWARD. commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "commitCCTransferFrom", id)
 
 			By("FORWARD. delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferTo", id)
 
 			By("FORWARD. delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferFrom", id)
 
 			By("FORWARD. check cc allowed balance. after deleteCCTransferFrom")
@@ -1028,9 +1018,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			By("BACKWARD. channel transfer by customer backward")
 			backwardItemsJSON, err := json.Marshal(transferItems)
 			Expect(err).NotTo(HaveOccurred())
-			client.TxInvokeWithSign(network, peer, network.Orderers[0],
-				cmn.ChannelCC, cmn.ChannelCC, admin, "channelMultiTransferByAdmin", "",
-				client.NewNonceByTime().Get(), nil, id2, "INDUSTRIAL", user1.AddressBase58Check, string(backwardItemsJSON))
+			client.ExecuteTaskWithSign(network, cmn.ChannelCC, cmn.ChannelCC, admin, nil,
+				"channelMultiTransferByAdmin", id2, "INDUSTRIAL", user1.AddressBase58Check, string(backwardItemsJSON))
 
 			By("BACKWARD. check cc allowed balance after channelMultiTransferByAdmin")
 			for _, item := range transferItems {
@@ -1053,8 +1042,8 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 			Expect(from).NotTo(BeEmpty())
 
 			By("BACKWARD. create cc transfer to")
-			client.TxInvokeByRobot(network, peer, network.Orderers[0],
-				cmn.ChannelIndustrial, cmn.ChannelIndustrial, nil, "createCCTransferTo", from)
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
+				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "createCCTransferTo", from)
 
 			By("BACKWARD. check cc balance after createCCTransferTo")
 			for _, item := range transferItems {
@@ -1076,15 +1065,15 @@ var _ = Describe("Channel transfer only tx foundation Tests", func() {
 				"channelTransferTo", id2)
 
 			By("BACKWARD. commit cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "commitCCTransferFrom", id2)
 
 			By("BACKWARD. delete cc transfer to")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelIndustrial, cmn.ChannelIndustrial, "deleteCCTransferTo", id2)
 
 			By("BACKWARD. delete cc transfer from")
-			client.NBTxInvokeByRobot(network, peer, network.Orderers[0], nil,
+			client.ExecuteTask(network, peer, network.Orderers[0], nil,
 				cmn.ChannelCC, cmn.ChannelCC, "deleteCCTransferFrom", id2)
 
 			By("BACKWARD. check cc allowed balance after deleteCCTransferFrom")
