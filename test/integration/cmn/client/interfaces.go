@@ -1,6 +1,7 @@
 package client
 
 import (
+	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/test/integration/cmn"
 	"github.com/anoideaopen/foundation/test/integration/cmn/client/types"
 	docker "github.com/fsouza/go-dockerclient"
@@ -104,6 +105,12 @@ type FieldGetter interface {
 	DockerClient() *docker.Client
 }
 
+type TaskExecutor interface {
+	ExecuteTask(channel string, chaincode string, method string, args ...string) string
+	ExecuteTasks(channel string, chaincode string, tasks ...*pbfound.Task) string
+	ExecuteTaskWithSign(channel string, chaincode string, user *UserFoundation, method string, args ...string) string
+}
+
 type TestSuite interface {
 	InvokeInterface
 	QueryInterface
@@ -111,4 +118,5 @@ type TestSuite interface {
 	StarterInterface
 	StopperInterface
 	FieldGetter
+	TaskExecutor
 }

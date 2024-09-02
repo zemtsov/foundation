@@ -189,7 +189,10 @@ func (e *TaskExecutor) validatedTxSenderMethodAndArgs(
 	}
 
 	span.AddEvent("validating authorization")
-	if !e.Chaincode.Router().AuthRequired(method) || senderAddress == nil {
+	if !e.Chaincode.Router().AuthRequired(method) {
+		return nil, method, invocationArgs, nil
+	}
+	if senderAddress == nil {
 		err = fmt.Errorf("failed to validate authorization for task %s: sender address is missing", task.GetId())
 		span.SetStatus(codes.Error, err.Error())
 		return nil, "", nil, err

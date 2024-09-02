@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/anoideaopen/foundation/core"
-	"github.com/anoideaopen/foundation/proto"
+	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/test/integration/cmn"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/hyperledger/fabric/integration/nwo"
@@ -16,7 +16,19 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func CreateTaskWithSignArgs(method string, channel string, chaincode string, user *UserFoundation, args ...string) (*proto.Task, error) {
+func newTaskID() string {
+	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+func createTask(method string, args ...string) *pbfound.Task {
+	return &pbfound.Task{
+		Id:     newTaskID(),
+		Method: method,
+		Args:   args,
+	}
+}
+
+func CreateTaskWithSignArgs(method string, channel string, chaincode string, user *UserFoundation, args ...string) (*pbfound.Task, error) {
 	requestID := time.Now().UTC().Format(time.RFC3339Nano)
 
 	args = append(append([]string{method, requestID, channel, chaincode}, args...), NewNonceByTime().Get())
@@ -28,47 +40,24 @@ func CreateTaskWithSignArgs(method string, channel string, chaincode string, use
 
 	args = append(args, pubKey, base58.Encode(sMsg))
 
-	taskID := time.Now().UTC().Format(time.RFC3339Nano)
-	task := &proto.Task{
-		Id:     taskID,
-		Method: method,
-		Args:   args[1:], // Exclude the method name from the args
-	}
+	task := createTask(method, args[1:]...) // Exclude the method name from the args
 
 	return task, nil
 }
 
-func ExecuteTaskWithSign(
-	network *nwo.Network,
-	channel string,
-	chaincode string,
-	user *UserFoundation,
-	checkErr CheckResultFunc,
-	method string,
-	args ...string,
-) string {
-	task, err := CreateTaskWithSignArgs(method, channel, chaincode, user, args...)
-	if err != nil {
-		panic(err)
-	}
-	txID := ExecuteTasks(network, network.Peers[0], network.Orderers[0], "User2", checkErr, channel, chaincode, task)
-	return txID
-}
-
-func ExecuteTasks(
+func executeTasks(
 	network *nwo.Network,
 	peer *nwo.Peer,
 	orderer *nwo.Orderer,
-	userOrg string,
 	checkErr CheckResultFunc,
 	channel string,
 	ccName string,
-	tasks ...*proto.Task,
+	tasks ...*pbfound.Task,
 ) string {
-	bytes, err := protojson.Marshal(&proto.ExecuteTasksRequest{Tasks: tasks})
+	bytes, err := protojson.Marshal(&pbfound.ExecuteTasksRequest{Tasks: tasks})
 	Expect(err).NotTo(HaveOccurred())
 
-	sess, err := network.PeerUserSession(peer, userOrg, commands.ChaincodeInvoke{
+	sess, err := network.PeerUserSession(peer, "User2", commands.ChaincodeInvoke{
 		ChannelID: channel,
 		Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
 		Name:      ccName,
