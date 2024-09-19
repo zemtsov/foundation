@@ -82,6 +82,10 @@ func NewTestSuite(components *nwo.Components) TestSuite {
 		options: &networkOptions{
 			RobotCfg:           cmn.RobotCfgDefault,
 			ChannelTransferCfg: cmn.ChannelTransferCfgDefault,
+			Templates: &cmn.TemplatesFound{
+				Robot:           "",
+				ChannelTransfer: "",
+			},
 		},
 		isInit: false,
 	}
@@ -126,7 +130,14 @@ func (ts *testSuite) InitNetwork(channels []string, testPort integration.TestPor
 		},
 	)
 
-	ts.networkFound = cmn.New(ts.network, ts.options.Channels, ts.options.RobotCfg, ts.options.ChannelTransferCfg)
+	ts.networkFound = cmn.New(
+		ts.network,
+		ts.options.Channels,
+		cmn.WithRobotCfg(ts.options.RobotCfg),
+		cmn.WithChannelTransferCfg(ts.options.ChannelTransferCfg),
+		cmn.WithRobotTemplate(ts.options.Templates.Robot),
+		cmn.WithChannelTransferTemplate(ts.options.Templates.ChannelTransfer),
+	)
 
 	if ts.redisDB != nil {
 		ts.networkFound.Robot.RedisAddresses = []string{ts.redisDB.Address()}
