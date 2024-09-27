@@ -24,7 +24,7 @@ options:
 channels:{{ range .Channels }}
   {{- if ne . "acl" }}
   - name: {{ . }}
-	{{- if $.HasBatcher }}
+    {{- if $.HasBatcher }}
     batcher:
       addressGRPC: "{{ $.BatcherGRPCAddress }}"
     {{- end }}
