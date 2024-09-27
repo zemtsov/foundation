@@ -137,6 +137,7 @@ func (ts *testSuite) InitNetwork(channels []string, testPort integration.TestPor
 		cmn.WithChannelTransferCfg(ts.options.ChannelTransferCfg),
 		cmn.WithRobotTemplate(ts.options.Templates.Robot),
 		cmn.WithChannelTransferTemplate(ts.options.Templates.ChannelTransfer),
+		cmn.WithBatcherCfg(ts.options.BatcherCfg),
 	)
 
 	if ts.redisDB != nil {

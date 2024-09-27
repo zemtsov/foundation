@@ -5,7 +5,7 @@ go 1.23.1
 require (
 	github.com/IBM/idemix v0.0.2-0.20231011101252-a4feda90f3f7
 	github.com/anoideaopen/acl v0.0.4-0.20240709131543-bf642c53380c
-	github.com/anoideaopen/channel-transfer v0.0.5
+	github.com/anoideaopen/channel-transfer v0.0.6-0.20240924163837-6a354e9667a6
 	github.com/anoideaopen/foundation v0.0.6-0.20240809062346-4a18d95a349b
 	github.com/anoideaopen/robot v0.0.3-0.20240730145328-bc561367aff8
 	github.com/btcsuite/btcd/btcutil v1.1.5
@@ -157,7 +157,6 @@ require (
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
-	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240725223205-93522f1f2a9f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240725223205-93522f1f2a9f // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect

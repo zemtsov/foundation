@@ -42,6 +42,7 @@ type NetworkFoundation struct {
 	Templates       *TemplatesFound
 	Channels        []string
 	LogLevelSDK     string
+	Batcher         *Batcher
 
 	mutex      sync.Locker
 	colorIndex uint
@@ -94,6 +95,12 @@ type ChannelTransfer struct {
 	RedisAddresses []string  `yaml:"redis_addresses,omitempty"`
 	AccessToken    string    `yaml:"access_token,omitempty"`
 	TTL            string    `yaml:"ttl,omitempty"`
+}
+
+// Batcher defines external batcher service
+type Batcher struct {
+	HostAddress string    `yaml:"host_address,omitempty"`
+	Ports       nwo.Ports `yaml:"ports,omitempty"`
 }
 
 func (n *NetworkFoundation) GenerateConfigTree() {
@@ -302,6 +309,31 @@ func (n *NetworkFoundation) ChannelTransferRunner(env ...string) *ginkgomon.Runn
 		StartCheck:        `Channel transfer started, time -`,
 		StartCheckTimeout: 15 * time.Second,
 	})
+}
+
+// BatcherGRPCAddress returns external batcher GRPC host & port as a string
+func (n *NetworkFoundation) BatcherGRPCAddress() string {
+	Expect(n.Batcher).NotTo(BeNil())
+	host := n.batcherHost()
+	port := n.batcherPort(GrpcPort)
+	return net.JoinHostPort(host, port)
+}
+
+// HasBatcher return true if external batcher initialized
+func (n *NetworkFoundation) HasBatcher() bool {
+	return n.Batcher != nil
+}
+
+func (n *NetworkFoundation) batcherHost() string {
+	host := n.Batcher.HostAddress
+	Expect(host).NotTo(BeNil())
+	return host
+}
+
+func (n *NetworkFoundation) batcherPort(portName nwo.PortName) string {
+	ports := n.Batcher.Ports
+	Expect(ports).NotTo(BeNil())
+	return fmt.Sprintf("%d", ports[portName])
 }
 
 func (n *NetworkFoundation) nextColor() string {

@@ -13,6 +13,7 @@ type networkOptions struct {
 	RobotCfg           *cmn.Robot
 	ChannelTransferCfg *cmn.ChannelTransfer
 	Templates          *cmn.TemplatesFound
+	BatcherCfg         *cmn.Batcher
 }
 
 // NetworkOption specifies some networkOption parameter
@@ -108,6 +109,30 @@ func WithChannelTransferAccessToken(token string) NetworkOption {
 func WithChannelTransferTTL(ttl string) NetworkOption {
 	return func(opt *networkOptions) error {
 		opt.ChannelTransferCfg.TTL = ttl
+		return nil
+	}
+}
+
+// Batcher options
+
+// WithBatcherHost specifies batcher host
+func WithBatcherHost(host string) NetworkOption {
+	return func(opt *networkOptions) error {
+		if opt.BatcherCfg == nil {
+			opt.BatcherCfg = &cmn.Batcher{}
+		}
+		opt.BatcherCfg.HostAddress = host
+		return nil
+	}
+}
+
+// WithBatcherPorts specifies batcher ports
+func WithBatcherPorts(ports nwo.Ports) NetworkOption {
+	return func(opt *networkOptions) error {
+		if opt.BatcherCfg == nil {
+			opt.BatcherCfg = &cmn.Batcher{}
+		}
+		opt.BatcherCfg.Ports = ports
 		return nil
 	}
 }

@@ -23,7 +23,11 @@ options:
   newestRequestStreamBufferSize: 50
 channels:{{ range .Channels }}
   {{- if ne . "acl" }}
-  - {{ . }}
+  - name: {{ . }}
+	{{- if $.HasBatcher }}
+    batcher:
+      addressGRPC: "{{ $.BatcherGRPCAddress }}"
+    {{- end }}
   {{- end }}
 {{- end }}
 redisStorage:
