@@ -1,6 +1,8 @@
 package client
 
 import (
+	"fmt"
+
 	"github.com/anoideaopen/foundation/test/integration/cmn"
 	"github.com/hyperledger/fabric/integration"
 	"github.com/hyperledger/fabric/integration/nwo"
@@ -8,12 +10,11 @@ import (
 
 // networkOptions is a struct for network mandatory and parameters that could be specified while network initializes
 type networkOptions struct {
-	Channels           []string
+	Channels           []*cmn.Channel
 	TestPort           integration.TestPortRange
 	RobotCfg           *cmn.Robot
 	ChannelTransferCfg *cmn.ChannelTransfer
 	Templates          *cmn.TemplatesFound
-	BatcherCfg         *cmn.Batcher
 }
 
 // NetworkOption specifies some networkOption parameter
@@ -24,7 +25,7 @@ type NetworkOption func(opts *networkOptions) error
 // WithChannels specifies network channels
 func WithChannels(channels []string) NetworkOption {
 	return func(opt *networkOptions) error {
-		opt.Channels = channels
+		opt.Channels = cmn.ChannelsFromNames(channels)
 		return nil
 	}
 }
@@ -115,25 +116,35 @@ func WithChannelTransferTTL(ttl string) NetworkOption {
 
 // Batcher options
 
-// WithBatcherHost specifies batcher host
-func WithBatcherHost(host string) NetworkOption {
+// WithBatcherHostForChannel specifies batcher host for a channel
+func WithBatcherHostForChannel(host string, channel string) NetworkOption {
 	return func(opt *networkOptions) error {
-		if opt.BatcherCfg == nil {
-			opt.BatcherCfg = &cmn.Batcher{}
+		for i, ch := range opt.Channels {
+			if ch.Name == channel {
+				if !ch.HasBatcher() {
+					opt.Channels[i].Batcher = &cmn.Batcher{}
+				}
+				opt.Channels[i].Batcher.HostAddress = host
+				return nil
+			}
 		}
-		opt.BatcherCfg.HostAddress = host
-		return nil
+		return fmt.Errorf("channel %s not found", channel)
 	}
 }
 
-// WithBatcherPorts specifies batcher ports
-func WithBatcherPorts(ports nwo.Ports) NetworkOption {
+// WithBatcherPortsForChannel specifies batcher ports for a channel
+func WithBatcherPortsForChannel(ports nwo.Ports, channel string) NetworkOption {
 	return func(opt *networkOptions) error {
-		if opt.BatcherCfg == nil {
-			opt.BatcherCfg = &cmn.Batcher{}
+		for i, ch := range opt.Channels {
+			if ch.Name == channel {
+				if !ch.HasBatcher() {
+					opt.Channels[i].Batcher = &cmn.Batcher{}
+				}
+				opt.Channels[i].Batcher.Ports = ports
+				return nil
+			}
 		}
-		opt.BatcherCfg.Ports = ports
-		return nil
+		return fmt.Errorf("channel %s not found", channel)
 	}
 }
 

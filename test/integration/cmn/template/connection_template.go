@@ -31,8 +31,8 @@ client:
         path: {{ .PeerUserTLSDir Peer User }}/client.key
 
 channels:{{ range .Channels }}
-  {{ . }}:
-    peers:{{ range $w.PeersWithChannel . }}
+  {{ .Name }}:
+    peers:{{ range $w.PeersWithChannel .Name }}
       {{ .ID }}: {}
     {{- end }}
 {{- end }}

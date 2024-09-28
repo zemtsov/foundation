@@ -16,13 +16,6 @@ func WithChannelTransferCfg(ctCfg *ChannelTransfer) NetworkFoundationOption {
 	}
 }
 
-func WithBatcherCfg(bcCfg *Batcher) NetworkFoundationOption {
-	return func(nf *NetworkFoundation) error {
-		nf.Batcher = bcCfg
-		return nil
-	}
-}
-
 func WithRobotTemplate(robotTemplate string) NetworkFoundationOption {
 	return func(nf *NetworkFoundation) error {
 		if robotTemplate != "" {

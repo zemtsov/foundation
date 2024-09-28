@@ -40,15 +40,14 @@ type NetworkFoundation struct {
 	Robot           *Robot
 	ChannelTransfer *ChannelTransfer
 	Templates       *TemplatesFound
-	Channels        []string
+	Channels        []*Channel
 	LogLevelSDK     string
-	Batcher         *Batcher
 
 	mutex      sync.Locker
 	colorIndex uint
 }
 
-func New(network *nwo.Network, channels []string, opts ...NetworkFoundationOption) *NetworkFoundation {
+func New(network *nwo.Network, channels []*Channel, opts ...NetworkFoundationOption) *NetworkFoundation {
 	n := &NetworkFoundation{
 		Network: network,
 		Templates: &TemplatesFound{
@@ -95,6 +94,12 @@ type ChannelTransfer struct {
 	RedisAddresses []string  `yaml:"redis_addresses,omitempty"`
 	AccessToken    string    `yaml:"access_token,omitempty"`
 	TTL            string    `yaml:"ttl,omitempty"`
+}
+
+// Channel defines a configuration of an HLF channel
+type Channel struct {
+	Name    string   `yaml:"name"`
+	Batcher *Batcher `yaml:"batcher,omitempty"`
 }
 
 // Batcher defines external batcher service
@@ -311,31 +316,6 @@ func (n *NetworkFoundation) ChannelTransferRunner(env ...string) *ginkgomon.Runn
 	})
 }
 
-// BatcherGRPCAddress returns external batcher GRPC host & port as a string
-func (n *NetworkFoundation) BatcherGRPCAddress() string {
-	Expect(n.Batcher).NotTo(BeNil())
-	host := n.batcherHost()
-	port := n.batcherPort(GrpcPort)
-	return net.JoinHostPort(host, port)
-}
-
-// HasBatcher return true if external batcher initialized
-func (n *NetworkFoundation) HasBatcher() bool {
-	return n.Batcher != nil
-}
-
-func (n *NetworkFoundation) batcherHost() string {
-	host := n.Batcher.HostAddress
-	Expect(host).NotTo(BeNil())
-	return host
-}
-
-func (n *NetworkFoundation) batcherPort(portName nwo.PortName) string {
-	ports := n.Batcher.Ports
-	Expect(ports).NotTo(BeNil())
-	return fmt.Sprintf("%d", ports[portName])
-}
-
 func (n *NetworkFoundation) nextColor() string {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
@@ -385,6 +365,38 @@ func (n *NetworkFoundation) OrdererTLSCACert(o *nwo.Orderer) string {
 	dirName := filepath.Join(n.OrdererLocalMSPDir(o), "tlscacerts")
 	fileName := fmt.Sprintf("tlsca.%s-cert.pem", n.Organization(o.Organization).Domain)
 	return filepath.Join(dirName, fileName)
+}
+
+func (c *Channel) HasBatcher() bool {
+	return c.Batcher != nil
+}
+
+// BatcherGRPCAddress returns external batcher GRPC host & port as a string
+func (c *Channel) BatcherGRPCAddress() string {
+	Expect(c.Batcher).NotTo(BeNil())
+	host := c.batcherHost()
+	port := c.batcherPort(GrpcPort)
+	return net.JoinHostPort(host, port)
+}
+
+func (c *Channel) batcherHost() string {
+	host := c.Batcher.HostAddress
+	Expect(host).NotTo(BeNil())
+	return host
+}
+
+func (c *Channel) batcherPort(portName nwo.PortName) string {
+	ports := c.Batcher.Ports
+	Expect(ports).NotTo(BeNil())
+	return fmt.Sprintf("%d", ports[portName])
+}
+
+func ChannelsFromNames(names []string) []*Channel {
+	channels := make([]*Channel, len(names))
+	for i, name := range names {
+		channels[i] = &Channel{Name: name}
+	}
+	return channels
 }
 
 func CtorFromSlice(s []string) string {

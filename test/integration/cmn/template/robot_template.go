@@ -27,12 +27,12 @@ redisStor:
   rootCAs: {{ .CACertsBundlePath }}
   withTLS: false
 robots:{{ range .Channels }}
-  {{- if ne . "acl" }}
-  - chName: {{ . }}
+  {{- if ne .Name "acl" }}
+  - chName: {{ .Name }}
     collectorsBufSize: 1000
     src: {{- range $w.Channels }}
-      {{- if ne . "acl" }}
-      - chName: {{ . }}
+      {{- if ne .Name "acl" }}
+      - chName: {{ .Name }}
         initBlockNum: 0
       {{- end }}
     {{- end }}

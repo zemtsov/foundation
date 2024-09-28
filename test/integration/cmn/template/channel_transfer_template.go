@@ -22,11 +22,11 @@ options:
   transfersInHandleOnChannel: 50
   newestRequestStreamBufferSize: 50
 channels:{{ range .Channels }}
-  {{- if ne . "acl" }}
-  - name: {{ . }}
-    {{- if $.HasBatcher }}
+  {{- if ne .Name "acl" }}
+  - name: {{ .Name }}
+    {{- if .HasBatcher }}
     batcher:
-      addressGRPC: "{{ $.BatcherGRPCAddress }}"
+      addressGRPC: "{{ .BatcherGRPCAddress }}"
     {{- end }}
   {{- end }}
 {{- end }}

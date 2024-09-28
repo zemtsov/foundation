@@ -94,7 +94,10 @@ func NewTestSuite(components *nwo.Components) TestSuite {
 }
 
 func (ts *testSuite) InitNetwork(channels []string, testPort integration.TestPortRange, opts ...NetworkOption) {
-	ts.options.Channels = channels
+	ts.options.Channels = make([]*cmn.Channel, len(channels))
+	for i, channel := range channels {
+		ts.options.Channels[i] = &cmn.Channel{Name: channel}
+	}
 	ts.options.TestPort = testPort
 
 	for _, opt := range opts {
@@ -110,7 +113,7 @@ func (ts *testSuite) InitNetwork(channels []string, testPort integration.TestPor
 	peerChannels := make([]*nwo.PeerChannel, 0, cap(ts.options.Channels))
 	for _, ch := range ts.options.Channels {
 		peerChannels = append(peerChannels, &nwo.PeerChannel{
-			Name:   ch,
+			Name:   ch.Name,
 			Anchor: true,
 		})
 	}
@@ -137,7 +140,6 @@ func (ts *testSuite) InitNetwork(channels []string, testPort integration.TestPor
 		cmn.WithChannelTransferCfg(ts.options.ChannelTransferCfg),
 		cmn.WithRobotTemplate(ts.options.Templates.Robot),
 		cmn.WithChannelTransferTemplate(ts.options.Templates.ChannelTransfer),
-		cmn.WithBatcherCfg(ts.options.BatcherCfg),
 	)
 
 	if ts.redisDB != nil {
@@ -166,7 +168,7 @@ func (ts *testSuite) InitNetwork(channels []string, testPort integration.TestPor
 
 	By("Joining orderers to channels")
 	for _, channel := range ts.options.Channels {
-		fabricnetwork.JoinChannel(ts.network, channel)
+		fabricnetwork.JoinChannel(ts.network, channel.Name)
 	}
 
 	By("Waiting for followers to see the leader")
@@ -176,7 +178,7 @@ func (ts *testSuite) InitNetwork(channels []string, testPort integration.TestPor
 
 	By("Joining peers to channels")
 	for _, channel := range ts.options.Channels {
-		ts.network.JoinChannel(channel, ts.orderer, ts.network.PeersWithChannel(channel)...)
+		ts.network.JoinChannel(channel.Name, ts.orderer, ts.network.PeersWithChannel(channel.Name)...)
 	}
 
 	pathToPrivateKeyBackend := ts.network.PeerUserKey(ts.peer, ts.mainUserName)
@@ -313,7 +315,11 @@ func (ts *testSuite) StopChannelTransfer() {
 
 func (ts *testSuite) DeployChaincodes() {
 	Expect(ts.options.Channels).NotTo(BeEmpty())
-	ts.DeployChaincodesByName(ts.options.Channels)
+	channelNames := make([]string, len(ts.options.Channels))
+	for i, ch := range ts.options.Channels {
+		channelNames[i] = ch.Name
+	}
+	ts.DeployChaincodesByName(channelNames)
 }
 
 func (ts *testSuite) DeployChaincodesByName(channels []string) {
