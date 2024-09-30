@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/anoideaopen/foundation/test/integration/cmn"
@@ -116,35 +117,28 @@ func WithChannelTransferTTL(ttl string) NetworkOption {
 
 // Batcher options
 
-// WithBatcherHostForChannel specifies batcher host for a channel
-func WithBatcherHostForChannel(host string, channel string) NetworkOption {
+func WithBatcherAddressForChannels(host string, ports nwo.Ports, forChannels ...string) NetworkOption {
 	return func(opt *networkOptions) error {
-		for i, ch := range opt.Channels {
-			if ch.Name == channel {
-				if !ch.HasBatcher() {
-					opt.Channels[i].Batcher = &cmn.Batcher{}
-				}
-				opt.Channels[i].Batcher.HostAddress = host
-				return nil
-			}
+		if len(forChannels) == 0 {
+			return errors.New("at least one channel is required")
 		}
-		return fmt.Errorf("channel %s not found", channel)
-	}
-}
 
-// WithBatcherPortsForChannel specifies batcher ports for a channel
-func WithBatcherPortsForChannel(ports nwo.Ports, channel string) NetworkOption {
-	return func(opt *networkOptions) error {
-		for i, ch := range opt.Channels {
-			if ch.Name == channel {
-				if !ch.HasBatcher() {
-					opt.Channels[i].Batcher = &cmn.Batcher{}
-				}
-				opt.Channels[i].Batcher.Ports = ports
-				return nil
+		allChannels := make(map[string]int)
+		for i, channel := range opt.Channels {
+			allChannels[channel.Name] = i
+		}
+
+		for _, forChannel := range forChannels {
+			i, channelExists := allChannels[forChannel]
+			if !channelExists {
+				return fmt.Errorf("channel %s not found", forChannel)
+			}
+			opt.Channels[i].Batcher = &cmn.Batcher{
+				HostAddress: host,
+				Ports:       ports,
 			}
 		}
-		return fmt.Errorf("channel %s not found", channel)
+		return nil
 	}
 }
 
