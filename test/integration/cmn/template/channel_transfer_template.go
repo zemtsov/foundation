@@ -22,8 +22,12 @@ options:
   transfersInHandleOnChannel: 50
   newestRequestStreamBufferSize: 50
 channels:{{ range .Channels }}
-  {{- if ne . "acl" }}
-  - {{ . }}
+  {{- if ne .Name "acl" }}
+  - name: {{ .Name }}
+    {{- if .HasTaskExecutor }}
+    taskExecutor:
+      addressGRPC: "{{ .TaskExecutorGRPCAddress }}"
+    {{- end }}
   {{- end }}
 {{- end }}
 redisStorage:

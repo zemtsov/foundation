@@ -40,14 +40,14 @@ type NetworkFoundation struct {
 	Robot           *Robot
 	ChannelTransfer *ChannelTransfer
 	Templates       *TemplatesFound
-	Channels        []string
+	Channels        []*Channel
 	LogLevelSDK     string
 
 	mutex      sync.Locker
 	colorIndex uint
 }
 
-func New(network *nwo.Network, channels []string, opts ...NetworkFoundationOption) *NetworkFoundation {
+func New(network *nwo.Network, channels []*Channel, opts ...NetworkFoundationOption) *NetworkFoundation {
 	n := &NetworkFoundation{
 		Network: network,
 		Templates: &TemplatesFound{
@@ -94,6 +94,18 @@ type ChannelTransfer struct {
 	RedisAddresses []string  `yaml:"redis_addresses,omitempty"`
 	AccessToken    string    `yaml:"access_token,omitempty"`
 	TTL            string    `yaml:"ttl,omitempty"`
+}
+
+// Channel defines a configuration of an HLF channel
+type Channel struct {
+	Name         string        `yaml:"name"`
+	TaskExecutor *TaskExecutor `yaml:"task_executor,omitempty"`
+}
+
+// TaskExecutor defines external task executor
+type TaskExecutor struct {
+	HostAddress string    `yaml:"host_address,omitempty"`
+	Ports       nwo.Ports `yaml:"ports,omitempty"`
 }
 
 func (n *NetworkFoundation) GenerateConfigTree() {
@@ -353,6 +365,38 @@ func (n *NetworkFoundation) OrdererTLSCACert(o *nwo.Orderer) string {
 	dirName := filepath.Join(n.OrdererLocalMSPDir(o), "tlscacerts")
 	fileName := fmt.Sprintf("tlsca.%s-cert.pem", n.Organization(o.Organization).Domain)
 	return filepath.Join(dirName, fileName)
+}
+
+func (c *Channel) HasTaskExecutor() bool {
+	return c.TaskExecutor != nil
+}
+
+// TaskExecutorGRPCAddress returns external task executor GRPC host & port as a string
+func (c *Channel) TaskExecutorGRPCAddress() string {
+	Expect(c.TaskExecutor).NotTo(BeNil())
+	host := c.taskExecutorHost()
+	port := c.taskExecutorPort(GrpcPort)
+	return net.JoinHostPort(host, port)
+}
+
+func (c *Channel) taskExecutorHost() string {
+	host := c.TaskExecutor.HostAddress
+	Expect(host).NotTo(BeNil())
+	return host
+}
+
+func (c *Channel) taskExecutorPort(portName nwo.PortName) string {
+	ports := c.TaskExecutor.Ports
+	Expect(ports).NotTo(BeNil())
+	return fmt.Sprintf("%d", ports[portName])
+}
+
+func ChannelsFromNames(names []string) []*Channel {
+	channels := make([]*Channel, len(names))
+	for i, name := range names {
+		channels[i] = &Channel{Name: name}
+	}
+	return channels
 }
 
 func CtorFromSlice(s []string) string {

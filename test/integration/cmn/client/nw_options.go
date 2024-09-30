@@ -1,6 +1,9 @@
 package client
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/anoideaopen/foundation/test/integration/cmn"
 	"github.com/hyperledger/fabric/integration"
 	"github.com/hyperledger/fabric/integration/nwo"
@@ -8,7 +11,7 @@ import (
 
 // networkOptions is a struct for network mandatory and parameters that could be specified while network initializes
 type networkOptions struct {
-	Channels           []string
+	Channels           []*cmn.Channel
 	TestPort           integration.TestPortRange
 	RobotCfg           *cmn.Robot
 	ChannelTransferCfg *cmn.ChannelTransfer
@@ -23,7 +26,7 @@ type NetworkOption func(opts *networkOptions) error
 // WithChannels specifies network channels
 func WithChannels(channels []string) NetworkOption {
 	return func(opt *networkOptions) error {
-		opt.Channels = channels
+		opt.Channels = cmn.ChannelsFromNames(channels)
 		return nil
 	}
 }
@@ -108,6 +111,33 @@ func WithChannelTransferAccessToken(token string) NetworkOption {
 func WithChannelTransferTTL(ttl string) NetworkOption {
 	return func(opt *networkOptions) error {
 		opt.ChannelTransferCfg.TTL = ttl
+		return nil
+	}
+}
+
+// TaskExecutor options
+
+func WithTaskExecutorForChannels(host string, ports nwo.Ports, forChannels ...string) NetworkOption {
+	return func(opt *networkOptions) error {
+		if len(forChannels) == 0 {
+			return errors.New("at least one channel is required")
+		}
+
+		allChannels := make(map[string]int)
+		for i, channel := range opt.Channels {
+			allChannels[channel.Name] = i
+		}
+
+		for _, forChannel := range forChannels {
+			i, channelExists := allChannels[forChannel]
+			if !channelExists {
+				return fmt.Errorf("channel %s not found", forChannel)
+			}
+			opt.Channels[i].TaskExecutor = &cmn.TaskExecutor{
+				HostAddress: host,
+				Ports:       ports,
+			}
+		}
 		return nil
 	}
 }

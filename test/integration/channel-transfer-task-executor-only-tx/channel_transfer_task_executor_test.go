@@ -1,4 +1,4 @@
-package channel_transfer_batcher_only_tx
+package channel_transfer_task_executor_only_tx
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Channel transfer only tx foundation Tests", func() {
+var _ = Describe("Channel transfer with task executor only tx foundation Tests", func() {
 	var (
 		channels = []string{cmn.ChannelAcl, cmn.ChannelCC, cmn.ChannelFiat, cmn.ChannelIndustrial}
 		ts       client.TestSuite

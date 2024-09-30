@@ -1,17 +1,18 @@
-package batcher_only_tx
+package channel_transfer_task_executor_only_tx
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/anoideaopen/foundation/test/integration/cmn/runner"
 	"github.com/hyperledger/fabric/integration/nwo"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-func TestBatcher(t *testing.T) {
+func TestChannelTransfer(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Batcher only tx Suite")
+	RunSpecs(t, "Channel transfer with task executor only tx Suite")
 }
 
 var (
@@ -20,7 +21,7 @@ var (
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
-	nwo.RequiredImages = []string{nwo.CCEnvDefaultImage}
+	nwo.RequiredImages = []string{nwo.CCEnvDefaultImage, runner.RedisDefaultImage}
 
 	buildServer = nwo.NewBuildServer()
 	buildServer.Serve()
