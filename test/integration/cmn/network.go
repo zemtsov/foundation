@@ -98,12 +98,12 @@ type ChannelTransfer struct {
 
 // Channel defines a configuration of an HLF channel
 type Channel struct {
-	Name    string   `yaml:"name"`
-	Batcher *Batcher `yaml:"batcher,omitempty"`
+	Name         string        `yaml:"name"`
+	TaskExecutor *TaskExecutor `yaml:"task_executor,omitempty"`
 }
 
-// Batcher defines external batcher service
-type Batcher struct {
+// TaskExecutor defines external task executor
+type TaskExecutor struct {
 	HostAddress string    `yaml:"host_address,omitempty"`
 	Ports       nwo.Ports `yaml:"ports,omitempty"`
 }
@@ -367,26 +367,26 @@ func (n *NetworkFoundation) OrdererTLSCACert(o *nwo.Orderer) string {
 	return filepath.Join(dirName, fileName)
 }
 
-func (c *Channel) HasBatcher() bool {
-	return c.Batcher != nil
+func (c *Channel) HasTaskExecutor() bool {
+	return c.TaskExecutor != nil
 }
 
-// BatcherGRPCAddress returns external batcher GRPC host & port as a string
-func (c *Channel) BatcherGRPCAddress() string {
-	Expect(c.Batcher).NotTo(BeNil())
-	host := c.batcherHost()
-	port := c.batcherPort(GrpcPort)
+// TaskExecutorGRPCAddress returns external task executor GRPC host & port as a string
+func (c *Channel) TaskExecutorGRPCAddress() string {
+	Expect(c.TaskExecutor).NotTo(BeNil())
+	host := c.taskExecutorHost()
+	port := c.taskExecutorPort(GrpcPort)
 	return net.JoinHostPort(host, port)
 }
 
-func (c *Channel) batcherHost() string {
-	host := c.Batcher.HostAddress
+func (c *Channel) taskExecutorHost() string {
+	host := c.TaskExecutor.HostAddress
 	Expect(host).NotTo(BeNil())
 	return host
 }
 
-func (c *Channel) batcherPort(portName nwo.PortName) string {
-	ports := c.Batcher.Ports
+func (c *Channel) taskExecutorPort(portName nwo.PortName) string {
+	ports := c.TaskExecutor.Ports
 	Expect(ports).NotTo(BeNil())
 	return fmt.Sprintf("%d", ports[portName])
 }

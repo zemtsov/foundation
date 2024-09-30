@@ -1,4 +1,4 @@
-package batcher_only_tx
+package task_executor_only_tx
 
 import (
 	pbfound "github.com/anoideaopen/foundation/proto"
@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Batcher only tx foundation Tests", func() {
+var _ = Describe("Task Executor only tx foundation Tests", func() {
 	var (
 		channels = []string{cmn.ChannelAcl, cmn.ChannelFiat}
 		ts       client.TestSuite
@@ -27,7 +27,7 @@ var _ = Describe("Batcher only tx foundation Tests", func() {
 		ts.DeployChaincodes()
 	})
 
-	Describe("batcher test", func() {
+	Describe("task executor test", func() {
 		var (
 			user1 *client.UserFoundation
 		)
@@ -43,7 +43,7 @@ var _ = Describe("Batcher only tx foundation Tests", func() {
 			ts.AddUser(user1)
 		})
 
-		It("execute batch with tx", func() {
+		It("execute tasks with tx", func() {
 			var (
 				emitAmount = "1000"
 			)
@@ -61,11 +61,11 @@ var _ = Describe("Batcher only tx foundation Tests", func() {
 			ts.ExecuteTaskWithSign(cmn.ChannelFiat, cmn.ChannelFiat, ts.Admin(), "healthCheckNb")
 		})
 
-		It("execute batch with tx", func() {
+		It("execute tasks with tx", func() {
 			ts.ExecuteTaskWithSign(cmn.ChannelFiat, cmn.ChannelFiat, ts.Admin(), "healthCheck")
 		})
 
-		It("execute batch with tx and nbtx", func() {
+		It("execute tasks with tx and nbtx", func() {
 			tasks := make([]*pbfound.Task, 0)
 			task, err := client.CreateTaskWithSignArgs("healthCheckNb", cmn.ChannelFiat, cmn.ChannelFiat, ts.Admin())
 			Expect(err).NotTo(HaveOccurred())

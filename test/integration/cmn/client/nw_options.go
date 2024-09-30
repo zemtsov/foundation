@@ -115,9 +115,9 @@ func WithChannelTransferTTL(ttl string) NetworkOption {
 	}
 }
 
-// Batcher options
+// TaskExecutor options
 
-func WithBatcherAddressForChannels(host string, ports nwo.Ports, forChannels ...string) NetworkOption {
+func WithTaskExecutorForChannels(host string, ports nwo.Ports, forChannels ...string) NetworkOption {
 	return func(opt *networkOptions) error {
 		if len(forChannels) == 0 {
 			return errors.New("at least one channel is required")
@@ -133,7 +133,7 @@ func WithBatcherAddressForChannels(host string, ports nwo.Ports, forChannels ...
 			if !channelExists {
 				return fmt.Errorf("channel %s not found", forChannel)
 			}
-			opt.Channels[i].Batcher = &cmn.Batcher{
+			opt.Channels[i].TaskExecutor = &cmn.TaskExecutor{
 				HostAddress: host,
 				Ports:       ports,
 			}
