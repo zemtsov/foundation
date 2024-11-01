@@ -11,12 +11,11 @@ import (
 	"github.com/anoideaopen/foundation/core/config"
 	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/core/types"
-	"github.com/anoideaopen/foundation/mock/stub"
+	"github.com/anoideaopen/foundation/mocks"
 	"github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/test/unit/fixtures_test"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/stretchr/testify/require"
@@ -29,8 +28,6 @@ const (
 )
 
 var (
-	testChaincodeName = "chaincode"
-
 	argsForTestFnWithFive          = []string{"4aap@*", "hyexc566", "kiubfvr$", ";3vkpp", "g?otov;"}
 	argsForTestFnWithSignedTwoArgs = []string{"1", "arg1"}
 
@@ -89,7 +86,7 @@ func TestSaveToBatchWithWrongArgs(t *testing.T) {
 	chainCode, errChainCode := NewCC(&testBatchContract{})
 	require.NoError(t, errChainCode)
 
-	mockStub := stub.NewMockStub(testChaincodeName, chainCode)
+	mockStub := &mocks.ChaincodeStub{}
 
 	cfgEtl := &proto.Config{
 		Contract: &proto.ContractConfig{
@@ -99,27 +96,19 @@ func TestSaveToBatchWithWrongArgs(t *testing.T) {
 	}
 	cfg, _ := protojson.Marshal(cfgEtl)
 
-	idBytes := [16]byte(uuid.New())
-	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfg})
-
 	err := config.Configure(chainCode.contract, cfg)
 	require.NoError(t, err)
 
-	mockStub.TxID = testEncodedTxID
-	mockStub.MockTransactionStart(testEncodedTxID)
-	mockStub.TxTimestamp = s.timestamp
-
 	// wrong number of arguments
-	mockStub.Args = [][]byte{[]byte(s.FnName), []byte("arg0"), []byte("arg1")}
-
+	mockStub.GetFunctionAndParametersReturns(s.FnName, []string{"arg0", "arg1"})
 	resp := chainCode.BatchHandler(
 		telemetry.TraceContext{},
 		mockStub,
 	)
-	require.Equal(t, resp.GetMessage(), "incorrect number of arguments: found 2 but expected 5: validate TxTestFnWithFiveArgsMethod")
+	require.Equal(t, "incorrect number of arguments: found 2 but expected 5: validate TxTestFnWithFiveArgsMethod", resp.GetMessage())
 }
 
-// TestSaveToBatchWithSignedArgs - negative test with wrong Args in saveToBatch
+// TestSaveToBatchWithSignedArgs - save to batch test
 func TestSaveToBatchWithSignedArgs(t *testing.T) {
 	t.Parallel()
 	s := &serieBatches{
@@ -132,7 +121,7 @@ func TestSaveToBatchWithSignedArgs(t *testing.T) {
 	chainCode, errChainCode := NewCC(&testBatchContract{})
 	require.NoError(t, errChainCode)
 
-	mockStub := stub.NewMockStub(testChaincodeName, chainCode)
+	mockStub := &mocks.ChaincodeStub{}
 
 	cfgEtl := &proto.Config{
 		Contract: &proto.ContractConfig{
@@ -142,19 +131,10 @@ func TestSaveToBatchWithSignedArgs(t *testing.T) {
 	}
 	cfg, _ := protojson.Marshal(cfgEtl)
 
-	idBytes := [16]byte(uuid.New())
-	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfg})
-
 	err := config.Configure(chainCode.contract, cfg)
 	require.NoError(t, err)
 
-	mockStub.TxID = testEncodedTxID
-	mockStub.MockTransactionStart(testEncodedTxID)
-	mockStub.TxTimestamp = s.timestamp
-
-	batchTimestamp, err := mockStub.GetTxTimestamp()
-	require.NoError(t, err)
-
+	batchTimestamp := s.timestamp
 	err = chainCode.saveToBatch(
 		telemetry.TraceContext{},
 		mockStub,
@@ -181,7 +161,7 @@ func TestSaveToBatchWithWrongSignedArgs(t *testing.T) {
 	chainCode, errChainCode := NewCC(&testBatchContract{})
 	require.NoError(t, errChainCode)
 
-	mockStub := stub.NewMockStub(testChaincodeName, chainCode)
+	mockStub := &mocks.ChaincodeStub{}
 
 	cfgEtl := &proto.Config{
 		Contract: &proto.ContractConfig{
@@ -191,15 +171,8 @@ func TestSaveToBatchWithWrongSignedArgs(t *testing.T) {
 	}
 	cfg, _ := protojson.Marshal(cfgEtl)
 
-	idBytes := [16]byte(uuid.New())
-	mockStub.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfg})
-
 	err := config.Configure(chainCode.contract, cfg)
 	require.NoError(t, err)
-
-	mockStub.TxID = testEncodedTxID
-	mockStub.MockTransactionStart(testEncodedTxID)
-	mockStub.TxTimestamp = s.timestamp
 
 	method := chainCode.Router().Method(s.FnName)
 
@@ -221,15 +194,6 @@ func TestSaveToBatchWrongFnName(t *testing.T) {
 	chainCode, errChainCode := NewCC(&testBatchContract{})
 	require.NoError(t, errChainCode)
 
-	ms := stub.NewMockStub(testChaincodeName, chainCode)
-
-	ms.TxID = testEncodedTxID
-	ms.MockTransactionStart(testEncodedTxID)
-	ms.TxTimestamp = s.timestamp
-
-	_, err := ms.GetTxTimestamp()
-	require.NoError(t, err)
-
 	cfg := &proto.Config{
 		Contract: &proto.ContractConfig{
 			Symbol:   "CC",
@@ -239,7 +203,7 @@ func TestSaveToBatchWrongFnName(t *testing.T) {
 	}
 	cfgBytes, _ := protojson.Marshal(cfg)
 
-	err = config.Configure(chainCode.contract, cfgBytes)
+	err := config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
 	method := chainCode.Router().Method(s.FnName)
@@ -265,7 +229,7 @@ func SaveAndLoadToBatchTest(t *testing.T, ser *serieBatches, args []string) {
 	chainCode, errChainCode := NewCC(&testBatchContract{})
 	require.NoError(t, errChainCode)
 
-	ms := stub.NewMockStub(testChaincodeName, chainCode)
+	mockStub := &mocks.ChaincodeStub{}
 
 	cfg := &proto.Config{
 		Contract: &proto.ContractConfig{
@@ -276,47 +240,39 @@ func SaveAndLoadToBatchTest(t *testing.T, ser *serieBatches, args []string) {
 	}
 	cfgBytes, _ := protojson.Marshal(cfg)
 
-	err := ms.SetAdminCreatorCert("platformMSP")
+	err := mocks.SetAdminCert(mockStub, "platformMSP")
 	require.NoError(t, err)
 
-	idBytes := [16]byte(uuid.New())
-	rsp := ms.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfgBytes})
-	require.Equal(t, int32(shim.OK), rsp.GetStatus(), rsp.GetMessage())
+	mockStub.GetStringArgsReturns([]string{string(cfgBytes)})
+	resp := chainCode.Init(mockStub)
+	require.Equal(t, int32(shim.OK), resp.GetStatus(), resp.GetMessage())
 
 	err = config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
-	ms.TxID = testEncodedTxID
-	ms.MockTransactionStart(testEncodedTxID)
-	if ser.timestamp != nil {
-		ms.TxTimestamp = ser.timestamp
-	}
-
-	batchTimestamp, err := ms.GetTxTimestamp()
+	batchTimestamp := createUtcTimestamp()
 	require.NoError(t, err)
 
 	errSave := chainCode.saveToBatch(
 		telemetry.TraceContext{},
-		ms,
+		mockStub,
 		ser.FnName,
 		sender,
 		args,
 		uint64(batchTimestamp.Seconds),
 	)
 	require.NoError(t, errSave)
-	ms.MockTransactionEnd(testEncodedTxID)
 
-	state, err := ms.GetState(fmt.Sprintf("\u0000batchTransactions\u0000%s\u0000", testEncodedTxID))
-	require.NotNil(t, state)
-	require.NoError(t, err)
-
+	// there ara two PutState operations: 1st one is the config init, 2nd is the transaction we need
+	_, value := mockStub.PutStateArgsForCall(1)
 	pending := new(proto.PendingTx)
-	err = pb.Unmarshal(state, pending)
+	err = pb.Unmarshal(value, pending)
 	require.NoError(t, err)
 
+	require.Equal(t, pending.Method, testFnWithFiveArgsMethod)
 	require.Equal(t, pending.Args, args)
 
-	pending, _, err = chainCode.loadFromBatch(ms, ser.testID)
+	pending, _, err = chainCode.loadFromBatch(mockStub, ser.testID)
 	if err != nil {
 		require.Equal(t, ser.errorMsg, err.Error())
 	} else {
@@ -373,9 +329,9 @@ func TestBatchExecuteWithWrongParams(t *testing.T) {
 	require.Len(t, response.TxResponses, 1)
 
 	txResponse := response.TxResponses[0]
-	require.Equal(t, txResponse.Id, testIDBytes)
-	require.Equal(t, txResponse.Method, "")
-	require.Equal(t, txResponse.Error.Error, "function and args loading error: transaction 776f6e646572 not found")
+	require.Equal(t, testIDBytes, txResponse.Id)
+	require.Equal(t, "", txResponse.Method)
+	require.Equal(t, "function and args loading error: transaction 776f6e646572 not found", txResponse.Error.Error)
 }
 
 // BatchExecuteTest - basic test for SaveBatch, LoadBatch and batchExecute
@@ -383,7 +339,7 @@ func BatchExecuteTest(t *testing.T, ser *serieBatchExecute, args []string) peer.
 	chainCode, err := NewCC(&testBatchContract{})
 	require.NoError(t, err)
 
-	ms := stub.NewMockStub(testChaincodeName, chainCode)
+	mockStub := &mocks.ChaincodeStub{}
 
 	cfg := &proto.Config{
 		Contract: &proto.ContractConfig{
@@ -394,48 +350,52 @@ func BatchExecuteTest(t *testing.T, ser *serieBatchExecute, args []string) peer.
 	}
 	cfgBytes, _ := protojson.Marshal(cfg)
 
-	err = ms.SetAdminCreatorCert("platformMSP")
+	err = mocks.SetAdminCert(mockStub, "platformMSP")
 	require.NoError(t, err)
 
-	idBytes := [16]byte(uuid.New())
-	rsp := ms.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfgBytes})
-	require.Equal(t, int32(shim.OK), rsp.GetStatus())
+	mockStub.GetStringArgsReturns([]string{string(cfgBytes)})
+	resp := chainCode.Init(mockStub)
+	require.Equal(t, int32(shim.OK), resp.GetStatus())
 
 	err = config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
-	ms.TxID = testEncodedTxID
-	ms.MockTransactionStart(testEncodedTxID)
-
-	batchTimestamp, err := ms.GetTxTimestamp()
+	batchTimestamp := createUtcTimestamp()
 	require.NoError(t, err)
 
 	err = chainCode.saveToBatch(
 		telemetry.TraceContext{},
-		ms,
+		mockStub,
 		testFnWithFiveArgsMethod,
 		nil,
 		args,
 		uint64(batchTimestamp.Seconds),
 	)
 	require.NoError(t, err)
-	ms.MockTransactionEnd(testEncodedTxID)
-	state, err := ms.GetState(fmt.Sprintf("\u0000batchTransactions\u0000%s\u0000", testEncodedTxID))
+
+	pendingTx := &proto.PendingTx{
+		Method:    testFnWithFiveArgsMethod,
+		Args:      args,
+		Timestamp: batchTimestamp.Seconds,
+	}
+
+	marshalled, err := pb.Marshal(pendingTx)
+	require.NoError(t, err)
+
+	mockStub.GetStateReturns(marshalled, nil)
+
+	state, err := mockStub.GetState(fmt.Sprintf("\u0000batchTransactions\u0000%s\u0000", testEncodedTxID))
 	require.NotNil(t, state)
 	require.NoError(t, err)
-
-	pending := new(proto.PendingTx)
-	err = pb.Unmarshal(state, pending)
-	require.NoError(t, err)
-
-	require.Equal(t, pending.Method, testFnWithFiveArgsMethod)
-	require.Equal(t, pending.Timestamp, batchTimestamp.Seconds)
-	require.Equal(t, pending.Args, args)
 
 	dataIn, err := pb.Marshal(&proto.Batch{TxIDs: [][]byte{ser.testIDBytes}})
 	require.NoError(t, err)
 
-	return chainCode.batchExecute(telemetry.TraceContext{}, ms, string(dataIn))
+	if ser.paramsWrongON {
+		mockStub.GetStateReturns(nil, fmt.Errorf("transaction 776f6e646572 not found"))
+	}
+
+	return chainCode.batchExecute(telemetry.TraceContext{}, mockStub, string(dataIn))
 }
 
 // TestBatchedTxExecute tests positive test for batchedTxExecute
@@ -443,11 +403,7 @@ func TestBatchedTxExecute(t *testing.T) {
 	chainCode, err := NewCC(&testBatchContract{})
 	require.NoError(t, err)
 
-	ms := stub.NewMockStub(testChaincodeName, chainCode)
-	require.NotNil(t, ms)
-
-	err = ms.SetAdminCreatorCert("platformMSP")
-	require.NoError(t, err)
+	mockStub := &mocks.ChaincodeStub{}
 
 	cfg := &proto.Config{
 		Contract: &proto.ContractConfig{
@@ -460,35 +416,42 @@ func TestBatchedTxExecute(t *testing.T) {
 
 	cfgBytes, _ := protojson.Marshal(cfg)
 
-	idBytes := [16]byte(uuid.New())
-	rsp := ms.MockInit(hex.EncodeToString(idBytes[:]), [][]byte{cfgBytes})
+	err = mocks.SetAdminCert(mockStub, "platformMSP")
+	require.NoError(t, err)
+
+	mockStub.GetStringArgsReturns([]string{string(cfgBytes)})
+	rsp := chainCode.Init(mockStub)
 	require.Equal(t, int32(shim.OK), rsp.GetStatus())
 
 	err = config.Configure(chainCode.contract, cfgBytes)
 	require.NoError(t, err)
 
-	ms.TxID = testEncodedTxID
+	batchStub := cachestub.NewBatchCacheStub(mockStub)
 
-	btchStub := cachestub.NewBatchCacheStub(ms)
-
-	ms.MockTransactionStart(testEncodedTxID)
-
-	batchTimestamp, err := ms.GetTxTimestamp()
+	batchTimestamp := createUtcTimestamp()
 	require.NoError(t, err)
 
 	err = chainCode.saveToBatch(
 		telemetry.TraceContext{},
-		ms,
+		mockStub,
 		testFnWithFiveArgsMethod,
 		nil,
 		argsForTestFnWithFive,
 		uint64(batchTimestamp.Seconds))
 	require.NoError(t, err)
-	ms.MockTransactionEnd(testEncodedTxID)
 
+	pendingTx := &proto.PendingTx{
+		Method:    testFnWithFiveArgsMethod,
+		Args:      argsForTestFnWithFive,
+		Timestamp: batchTimestamp.Seconds,
+	}
+	marshalled, err := pb.Marshal(pendingTx)
+	require.NoError(t, err)
+
+	mockStub.GetStateReturns(marshalled, nil)
 	resp, event := chainCode.batchedTxExecute(
 		telemetry.TraceContext{},
-		btchStub,
+		batchStub,
 		txIDBytes,
 	)
 	require.NotNil(t, resp)
