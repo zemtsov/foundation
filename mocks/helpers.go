@@ -9,7 +9,7 @@ import (
 	"github.com/hyperledger/fabric-protos-go/msp"
 )
 
-const defaultCert = `MIICSjCCAfGgAwIBAgIRAKeZTS2c/qkXBN0Vkh+0WYQwCgYIKoZIzj0EAwIwgYcx
+const DefaultCert = `MIICSjCCAfGgAwIBAgIRAKeZTS2c/qkXBN0Vkh+0WYQwCgYIKoZIzj0EAwIwgYcx
 CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4g
 RnJhbmNpc2NvMSMwIQYDVQQKExphdG9teXplLnVhdC5kbHQuYXRvbXl6ZS5jaDEm
 MCQGA1UEAxMdY2EuYXRvbXl6ZS51YXQuZGx0LmF0b215emUuY2gwHhcNMjAxMDEz
@@ -23,7 +23,7 @@ qWu/AwOtbOjaLd68woAqAklfKKhfu10K+DAKBggqhkjOPQQDAgNHADBEAiBFB6RK
 O7huI84Dy3fXeA324ezuqpJJkfQOJWkbHjL+pQIgFKIqBJrDl37uXNd3eRGJTL+o
 21ZL8pGXH8h0nHjOF9M=`
 
-const adminCert = `MIICSDCCAe6gAwIBAgIQAJwYy5PJAYSC1i0UgVN5bjAKBggqhkjOPQQDAjCBhzEL
+const AdminCert = `MIICSDCCAe6gAwIBAgIQAJwYy5PJAYSC1i0UgVN5bjAKBggqhkjOPQQDAjCBhzEL
 MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
 cmFuY2lzY28xIzAhBgNVBAoTGmF0b215emUudWF0LmRsdC5hdG9teXplLmNoMSYw
 JAYDVQQDEx1jYS5hdG9teXplLnVhdC5kbHQuYXRvbXl6ZS5jaDAeFw0yMDEwMTMw
@@ -37,23 +37,13 @@ AwOtbOjaLd68woAqAklfKKhfu10K+DAKBggqhkjOPQQDAgNIADBFAiEAoKRQLe4U
 FfAAwQs3RCWpevOPq+J8T4KEsYvswKjzfJYCIAs2kOmN/AsVUF63unXJY0k9ktfD
 fAaqNRaboY1Yg1iQ`
 
-func SetAdminCert(stub *ChaincodeStub, msp string) error {
-	cert, _ := base64.StdEncoding.DecodeString(adminCert)
-	creator, err := BuildCreator(msp, cert)
+func SetCreatorCert(mockStub *ChaincodeStub, msp string, cert string) error {
+	certificate, _ := base64.StdEncoding.DecodeString(cert)
+	creator, err := BuildCreator(msp, certificate)
 	if err != nil {
 		return err
 	}
-	stub.GetCreatorReturns(creator, nil)
-	return nil
-}
-
-func SetDefaultCreatorCert(stub *ChaincodeStub, msp string) error {
-	cert, _ := base64.StdEncoding.DecodeString(defaultCert)
-	creator, err := BuildCreator(msp, cert)
-	if err != nil {
-		return err
-	}
-	stub.GetCreatorReturns(creator, nil)
+	mockStub.GetCreatorReturns(creator, nil)
 	return nil
 }
 
