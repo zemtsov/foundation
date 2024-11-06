@@ -2,11 +2,16 @@ package mocks
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"testing"
 
 	"github.com/golang/protobuf/proto" //nolint:staticcheck
+	"github.com/google/uuid"
 	"github.com/hyperledger/fabric-protos-go/msp"
+	"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/stretchr/testify/require"
 )
 
 const DefaultCert = `MIICSjCCAfGgAwIBAgIRAKeZTS2c/qkXBN0Vkh+0WYQwCgYIKoZIzj0EAwIwgYcx
@@ -37,9 +42,11 @@ AwOtbOjaLd68woAqAklfKKhfu10K+DAKBggqhkjOPQQDAgNIADBFAiEAoKRQLe4U
 FfAAwQs3RCWpevOPq+J8T4KEsYvswKjzfJYCIAs2kOmN/AsVUF63unXJY0k9ktfD
 fAaqNRaboY1Yg1iQ`
 
+const TestCreatorMSP = "platformMSP"
+
 func SetCreatorCert(mockStub *ChaincodeStub, msp string, cert string) error {
 	certificate, _ := base64.StdEncoding.DecodeString(cert)
-	creator, err := BuildCreator(msp, certificate)
+	creator, err := MarshalIdentity(msp, certificate)
 	if err != nil {
 		return err
 	}
@@ -47,7 +54,7 @@ func SetCreatorCert(mockStub *ChaincodeStub, msp string, cert string) error {
 	return nil
 }
 
-func BuildCreator(creatorMSP string, creatorCert []byte) ([]byte, error) {
+func MarshalIdentity(creatorMSP string, creatorCert []byte) ([]byte, error) {
 	pemblock := &pem.Block{Type: "CERTIFICATE", Bytes: creatorCert}
 	pemBytes := pem.EncodeToMemory(pemblock)
 	if pemBytes == nil {
@@ -60,4 +67,17 @@ func BuildCreator(creatorMSP string, creatorCert []byte) ([]byte, error) {
 		return nil, err
 	}
 	return marshaledIdentity, nil
+}
+
+// NewMockStub returns new mock stub
+func NewMockStub(t *testing.T) *ChaincodeStub {
+	mockStub := new(ChaincodeStub)
+	txID := [16]byte(uuid.New())
+	mockStub.GetTxIDReturns(hex.EncodeToString(txID[:]))
+	mockStub.GetSignedProposalReturns(&peer.SignedProposal{}, nil)
+
+	err := SetCreatorCert(mockStub, TestCreatorMSP, AdminCert)
+	require.NoError(t, err)
+
+	return mockStub
 }
