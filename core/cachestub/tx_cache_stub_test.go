@@ -2,8 +2,10 @@ package cachestub
 
 import (
 	"testing"
+	"time"
 
 	"github.com/anoideaopen/foundation/mocks"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +29,8 @@ func TestTxStub(t *testing.T) {
 		// creating batch cache stub
 		batchStub := NewBatchCacheStub(stateStub)
 		// creating tx cache stub
-		txStub := batchStub.NewTxCacheStub(txID1)
+		txTime := createUtcTimestamp()
+		txStub := batchStub.NewTxCacheStub(txID1, txTime)
 
 		// requesting data from state
 		result, err := txStub.GetState(valKey1)
@@ -45,7 +48,8 @@ func TestTxStub(t *testing.T) {
 		// creating batch cache stub
 		batchStub := NewBatchCacheStub(stateStub)
 		// creating tx cache stub
-		txStub := batchStub.NewTxCacheStub(txID1)
+		txTime := createUtcTimestamp()
+		txStub := batchStub.NewTxCacheStub(txID1, txTime)
 
 		// requesting data from state
 		_, err := txStub.GetState(valKey1)
@@ -63,7 +67,8 @@ func TestTxStub(t *testing.T) {
 		// creating batch cache stub
 		batchStub := NewBatchCacheStub(stateStub)
 		// creating tx cache stub
-		txStub := batchStub.NewTxCacheStub(txID1)
+		txTime := createUtcTimestamp()
+		txStub := batchStub.NewTxCacheStub(txID1, txTime)
 
 		// checking previously saved data
 		result, err := txStub.GetState(valKey1)
@@ -150,7 +155,8 @@ func TestTxStub(t *testing.T) {
 		// creating batch cache stub
 		batchStub := NewBatchCacheStub(stateStub)
 		// creating tx cache stub
-		txStub := batchStub.NewTxCacheStub(txID1)
+		txTime := createUtcTimestamp()
+		txStub := batchStub.NewTxCacheStub(txID1, txTime)
 
 		err := txStub.PutState(valKey1, []byte(valKey1Value1))
 		require.NoError(t, err)
@@ -172,7 +178,8 @@ func TestTxStub(t *testing.T) {
 		// creating batch cache stub
 		batchStub := NewBatchCacheStub(stateStub)
 		// creating tx cache stub
-		txStub := batchStub.NewTxCacheStub(txID1)
+		txTime := createUtcTimestamp()
+		txStub := batchStub.NewTxCacheStub(txID1, txTime)
 
 		// checking data before deletion
 		result, err := txStub.GetState(valKey1)
@@ -258,7 +265,8 @@ func TestTxStub(t *testing.T) {
 		// creating batch cache stub
 		batchStub := NewBatchCacheStub(stateStub)
 		// creating tx cache stub
-		txStub := batchStub.NewTxCacheStub(txID1)
+		txTime := createUtcTimestamp()
+		txStub := batchStub.NewTxCacheStub(txID1, txTime)
 
 		// deleting data from tx stub
 		err := txStub.DelState(valKey1)
@@ -284,7 +292,8 @@ func TestTxStub(t *testing.T) {
 		// creating batch cache stub
 		batchStub := NewBatchCacheStub(stateStub)
 		// creating tx cache stub
-		txStub := batchStub.NewTxCacheStub(txID1)
+		txTime := createUtcTimestamp()
+		txStub := batchStub.NewTxCacheStub(txID1, txTime)
 
 		// checking test data
 		result, err := txStub.GetState(valKey1)
@@ -320,7 +329,7 @@ func TestTxStub(t *testing.T) {
 		txStub.Commit()
 
 		// creating second transaction in batch
-		txStub = batchStub.NewTxCacheStub(txID2)
+		txStub = batchStub.NewTxCacheStub(txID2, txTime)
 		_ = txStub.PutState(valKey4, []byte(valKey4Value1))
 		_ = txStub.DelState(valKey4)
 		txStub.Commit()
@@ -333,7 +342,7 @@ func TestTxStub(t *testing.T) {
 		_ = batchStub.Commit()
 
 		// creating third transaction in batch
-		txStub = batchStub.NewTxCacheStub(txID3)
+		txStub = batchStub.NewTxCacheStub(txID3, txTime)
 
 		val, _ = txStub.GetState(valKey4)
 		if string(val) == "" {
@@ -353,4 +362,12 @@ func TestTxStub(t *testing.T) {
 		require.Equal(t, 5, stateStub.PutStateCallCount())
 		require.Equal(t, 3, stateStub.DelStateCallCount())
 	})
+}
+
+// CreateUtcTimestamp returns a Google/protobuf/Timestamp in UTC
+func createUtcTimestamp() *timestamp.Timestamp {
+	now := time.Now().UTC()
+	secs := now.Unix()
+	nanos := int32(now.UnixNano() - (secs * 1000000000))
+	return &(timestamp.Timestamp{Seconds: secs, Nanos: nanos})
 }

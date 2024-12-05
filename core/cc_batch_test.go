@@ -453,6 +453,7 @@ func TestBatchedTxExecute(t *testing.T) {
 		telemetry.TraceContext{},
 		batchStub,
 		txIDBytes,
+		batchTimestamp,
 	)
 	require.NotNil(t, resp)
 	require.NotNil(t, event)

@@ -16,6 +16,7 @@ import (
 	"github.com/anoideaopen/foundation/hlfcreator"
 	"github.com/anoideaopen/foundation/proto"
 	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -142,8 +143,17 @@ func (e *TaskExecutor) ExecuteTasks(
 
 	predictACLCalls(e.BatchCacheStub, tasks, e.Chaincode)
 
-	for _, task := range tasks {
-		txResponse, txEvent := e.ExecuteTask(traceCtx, task, e.BatchCacheStub)
+	batchTxTime, err := e.BatchCacheStub.GetTxTimestamp()
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't get timestamp for batch %s: %w", e.BatchCacheStub.GetTxID(), err)
+	}
+
+	for taskIdx, task := range tasks {
+		taskTimestamp := &timestamp.Timestamp{
+			Seconds: batchTxTime.GetSeconds(),
+			Nanos:   batchTxTime.GetNanos() + int32(taskIdx),
+		}
+		txResponse, txEvent := e.ExecuteTask(traceCtx, task, e.BatchCacheStub, taskTimestamp)
 		batchResponse.TxResponses = append(batchResponse.TxResponses, txResponse)
 		batchEvent.Events = append(batchEvent.Events, txEvent)
 	}
@@ -227,6 +237,7 @@ func (e *TaskExecutor) ExecuteTask(
 	traceCtx telemetry.TraceContext,
 	task *proto.Task,
 	stub *cachestub.BatchCacheStub,
+	txTimestamp *timestamp.Timestamp,
 ) (txResponse *proto.TxResponse, batchTxEvent *proto.BatchTxEvent) {
 	traceCtx, span := e.TracingHandler.StartNewSpan(traceCtx, "TaskExecutor.ExecuteTasks")
 	defer span.End()
@@ -248,7 +259,7 @@ func (e *TaskExecutor) ExecuteTask(
 		}
 	}()
 
-	txCacheStub := stub.NewTxCacheStub(task.GetId())
+	txCacheStub := stub.NewTxCacheStub(task.GetId(), txTimestamp)
 
 	span.AddEvent("validating tx sender method and args")
 	senderAddress, method, args, err := e.validatedTxSenderMethodAndArgs(traceCtx, stub, task)
