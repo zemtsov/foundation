@@ -17,6 +17,7 @@ import (
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/proto"
 	pb "github.com/golang/protobuf/proto" //nolint:staticcheck
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric-chaincode-go/shim"
 	"github.com/hyperledger/fabric-protos-go/peer"
 	"go.opentelemetry.io/otel/attribute"
@@ -168,13 +169,23 @@ func (cc *Chaincode) batchExecute(
 		return shim.Error(err.Error())
 	}
 
+	batchTxTime, err := batchStub.GetTxTimestamp()
+	if err != nil {
+		log.Errorf("couldn't get timestamp for batch %s: %s", batchID, err.Error())
+		return shim.Error(err.Error())
+	}
+
 	log.Warningf("batch: tx id: %s, txs: %d", batchID, len(batch.GetTxIDs()))
 
 	span.AddEvent("handle transactions in batch")
 	ids := make([]string, 0, len(batch.GetTxIDs()))
-	for _, txID := range batch.GetTxIDs() {
+	for txIdx, txID := range batch.GetTxIDs() {
+		txTimestamp := &timestamp.Timestamp{
+			Seconds: batchTxTime.GetSeconds(),
+			Nanos:   batchTxTime.GetNanos() + int32(txIdx),
+		}
 		ids = append(ids, hex.EncodeToString(txID))
-		resp, event := cc.batchedTxExecute(traceCtx, batchStub, txID)
+		resp, event := cc.batchedTxExecute(traceCtx, batchStub, txID, txTimestamp)
 		response.TxResponses = append(response.TxResponses, resp)
 		events.Events = append(events.Events, event)
 	}
@@ -247,6 +258,7 @@ func (cc *Chaincode) batchedTxExecute(
 	traceCtx telemetry.TraceContext,
 	stub *cachestub.BatchCacheStub,
 	binaryTxID []byte,
+	txTimestamp *timestamp.Timestamp,
 ) (r *proto.TxResponse, e *proto.BatchTxEvent) {
 	traceCtx, span := cc.contract.TracingHandler().StartNewSpan(traceCtx, "batchTxExecute")
 	defer span.End()
@@ -290,7 +302,7 @@ func (cc *Chaincode) batchedTxExecute(
 			&proto.BatchTxEvent{Id: binaryTxID, Error: &ee}
 	}
 
-	txStub := stub.NewTxCacheStub(txID)
+	txStub := stub.NewTxCacheStub(txID, txTimestamp)
 	method := cc.Router().Method(pending.GetMethod())
 	if method == "" {
 		msg := fmt.Sprintf(

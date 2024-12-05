@@ -7,21 +7,24 @@ import (
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/proto"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	pb "github.com/hyperledger/fabric-protos-go/peer"
 )
 
 type TxCacheStub struct {
 	*BatchCacheStub
 	txID         string
+	txTimestamp  *timestamp.Timestamp
 	txWriteCache map[string]*proto.WriteElement
 	events       map[string][]byte
 	Accounting   []*proto.AccountingRecord
 }
 
-func (bs *BatchCacheStub) NewTxCacheStub(txID string) *TxCacheStub {
+func (bs *BatchCacheStub) NewTxCacheStub(txID string, txTimestamp *timestamp.Timestamp) *TxCacheStub {
 	return &TxCacheStub{
 		BatchCacheStub: bs,
 		txID:           txID,
+		txTimestamp:    txTimestamp,
 		txWriteCache:   make(map[string]*proto.WriteElement),
 		events:         make(map[string][]byte),
 	}
@@ -30,6 +33,11 @@ func (bs *BatchCacheStub) NewTxCacheStub(txID string) *TxCacheStub {
 // GetTxID returns TxCacheStub transaction ID
 func (bts *TxCacheStub) GetTxID() string {
 	return bts.txID
+}
+
+// GetTxTimestamp returns TxCacheStub transaction timestamp
+func (bts *TxCacheStub) GetTxTimestamp() (*timestamp.Timestamp, error) {
+	return bts.txTimestamp, nil
 }
 
 // GetState returns state from TxCacheStub cache or, if absent, from batchState cache

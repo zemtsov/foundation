@@ -52,7 +52,7 @@ func Answer(stub *cachestub.BatchCacheStub, swap *proto.MultiSwap, robotSideTime
 	if err != nil {
 		return &proto.SwapResponse{Id: swap.GetId(), Error: &proto.ResponseError{Error: err.Error()}}
 	}
-	txStub := stub.NewTxCacheStub(hex.EncodeToString(swap.GetId()))
+	txStub := stub.NewTxCacheStub(hex.EncodeToString(swap.GetId()), ts)
 
 	swap.Creator = []byte("0000")
 	swap.Timeout = ts.GetSeconds() + robotSideTimeout
@@ -85,7 +85,12 @@ func RobotDone(stub *cachestub.BatchCacheStub, swapID []byte, key string) (r *pr
 		}
 	}()
 
-	txStub := stub.NewTxCacheStub(hex.EncodeToString(swapID))
+	ts, err := stub.GetTxTimestamp()
+	if err != nil {
+		return &proto.SwapResponse{Id: swapID, Error: &proto.ResponseError{Error: err.Error()}}
+	}
+
+	txStub := stub.NewTxCacheStub(hex.EncodeToString(swapID), ts)
 	swap, err := Load(txStub, hex.EncodeToString(swapID))
 	if err != nil {
 		return &proto.SwapResponse{Id: swapID, Error: &proto.ResponseError{Error: err.Error()}}
