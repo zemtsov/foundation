@@ -11,6 +11,7 @@ import (
 	"github.com/anoideaopen/foundation/core/config"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/mocks"
+	"github.com/anoideaopen/foundation/mocks/mockstub"
 	pb "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/test/unit/fixtures_test"
 	"github.com/anoideaopen/foundation/token"
@@ -139,7 +140,7 @@ func TestInitWithPositionedArgs(t *testing.T) {
 
 	for _, test := range testsCollection {
 		t.Run(test.channel, func(t *testing.T) {
-			mockStub := mocks.NewMockStub(t)
+			mockStub := mockstub.NewMockStub(t)
 
 			cc, err := core.NewCC(test.bci)
 			require.NoError(t, err)
@@ -186,7 +187,7 @@ func TestInitWithCommonConfig(t *testing.T) {
 	issuer, err := mocks.NewUserFoundation(pb.KeyType_ed25519)
 	require.NoError(t, err)
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	ttName, ttSymbol, ttDecimals := "test token", "TT", uint32(8)
 
@@ -241,7 +242,7 @@ func TestInitWithCommonConfig(t *testing.T) {
 func TestWithConfigMapperFunc(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	issuer, err := mocks.NewUserFoundation(pb.KeyType_ed25519)
 	require.NoError(t, err)
@@ -283,7 +284,8 @@ func TestWithConfigMapperFunc(t *testing.T) {
 func TestWithConfigMapperFuncFromArgs(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
+
 	issuer, err := mocks.NewUserFoundation(pb.KeyType_ed25519)
 	require.NoError(t, err)
 
@@ -326,7 +328,7 @@ func TestWithConfigMapperFuncFromArgs(t *testing.T) {
 func TestDisabledFunctions(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	user1, err := mocks.NewUserFoundation(pb.KeyType_ed25519)
 	require.NoError(t, err)
@@ -349,7 +351,7 @@ func TestDisabledFunctions(t *testing.T) {
 	// Calling TxTestFunction while it's not disabled
 	mockStub.GetStateReturns(config1, nil)
 
-	err = mocks.SetFunctionAndParametersWithSign(mockStub, user1, testFunctionName, "", "", "")
+	err = mocks.SetFunctionAndParametersWithSign(mockStub.ChaincodeStub, user1, testFunctionName, "", "", "")
 	require.NoError(t, err)
 
 	resp := cc.Invoke(mockStub)
@@ -369,7 +371,7 @@ func TestDisabledFunctions(t *testing.T) {
 
 	//Calling TxTestFunction while it's disabled
 	mockStub.GetStateReturns(config2, nil)
-	err = mocks.SetFunctionAndParametersWithSign(mockStub, user1, testFunctionName, "", "", "")
+	err = mocks.SetFunctionAndParametersWithSign(mockStub.ChaincodeStub, user1, testFunctionName, "", "", "")
 	require.NoError(t, err)
 
 	resp = cc.Invoke(mockStub)
@@ -379,7 +381,7 @@ func TestDisabledFunctions(t *testing.T) {
 func TestInitWithEmptyConfig(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	cfg := `{}`
 
@@ -550,7 +552,7 @@ func (tect *TestExtConfigToken) QueryExtConfig() (*ExtConfig, error) {
 func TestInitWithExtConfig(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	issuer, err := mocks.NewUserFoundation(pb.KeyType_ed25519)
 	require.NoError(t, err)

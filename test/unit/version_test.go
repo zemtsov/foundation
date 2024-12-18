@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/anoideaopen/foundation/core"
-	"github.com/anoideaopen/foundation/mocks"
+	"github.com/anoideaopen/foundation/mocks/mockstub"
 	"github.com/anoideaopen/foundation/token"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +22,7 @@ var f embed.FS
 func TestEmbedSrcFiles(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	tt := &token.BaseToken{}
 	config := makeBaseTokenConfig(
@@ -87,7 +87,7 @@ func TestEmbedSrcFilesWithoutFS(t *testing.T) {
 
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	tt := &token.BaseToken{}
 	config := makeBaseTokenConfig(
@@ -128,7 +128,7 @@ func TestEmbedSrcFilesWithoutFS(t *testing.T) {
 func TestBuildInfo(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	tt := &token.BaseToken{}
 	config := makeBaseTokenConfig(
@@ -162,7 +162,7 @@ func TestBuildInfo(t *testing.T) {
 func TestSysEnv(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	tt := &token.BaseToken{}
 	config := makeBaseTokenConfig(
@@ -198,7 +198,7 @@ func TestSysEnv(t *testing.T) {
 func TestCoreChaincodeIdName(t *testing.T) {
 	t.Parallel()
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	tt := &token.BaseToken{}
 	config := makeBaseTokenConfig(

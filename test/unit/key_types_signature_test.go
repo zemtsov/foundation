@@ -9,6 +9,7 @@ import (
 	"github.com/anoideaopen/foundation/core/balance"
 	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/mocks"
+	"github.com/anoideaopen/foundation/mocks/mockstub"
 	pbfound "github.com/anoideaopen/foundation/proto"
 	pb "github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
@@ -38,7 +39,7 @@ func TestKeyTypesEmission(t *testing.T) {
 
 	for _, test := range testCollection {
 		t.Run(test.name, func(t *testing.T) {
-			mockStub := mocks.NewMockStub(t)
+			mockStub := mockstub.NewMockStub(t)
 
 			issuer, err := mocks.NewUserFoundation(test.keyType)
 			require.NoError(t, err)
@@ -68,7 +69,7 @@ func TestKeyTypesEmission(t *testing.T) {
 			pendingMarshalled, err := pb.Marshal(pending)
 			require.NoError(t, err)
 
-			mocks.ACLGetAccountInfo(t, mockStub, 0)
+			mocks.ACLGetAccountInfo(t, mockStub.ChaincodeStub, 0)
 			mockStub.GetStateReturnsOnCall(0, []byte(config), nil)
 			mockStub.GetStateReturnsOnCall(1, pendingMarshalled, nil)
 			mockStub.GetStateReturnsOnCall(2, big.NewInt(1000).Bytes(), nil)
@@ -76,7 +77,7 @@ func TestKeyTypesEmission(t *testing.T) {
 			dataIn, err := pb.Marshal(&pbfound.Batch{TxIDs: [][]byte{[]byte("testTxID")}})
 			require.NoError(t, err)
 
-			err = mocks.SetCreator(mockStub, BatchRobotCert)
+			err = mocks.SetCreator(mockStub.ChaincodeStub, BatchRobotCert)
 			require.NoError(t, err)
 
 			mockStub.GetFunctionAndParametersReturns("batchExecute", []string{string(dataIn)})

@@ -9,6 +9,7 @@ import (
 	"github.com/anoideaopen/foundation/core"
 	"github.com/anoideaopen/foundation/core/balance"
 	"github.com/anoideaopen/foundation/mocks"
+	"github.com/anoideaopen/foundation/mocks/mockstub"
 	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/token"
 	pb "github.com/golang/protobuf/proto"
@@ -33,7 +34,7 @@ func TestCreateIndex(t *testing.T) {
 	user3, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
 	require.NoError(t, err)
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	config := makeBaseTokenConfig(
 		"Test Token",
@@ -107,7 +108,7 @@ func TestCreateIndex(t *testing.T) {
 	require.Equal(t, "", resp.Message)
 
 	// checking index created and owners appears
-	indexCreated, ownersAfterIndexing := checkIndexAndOwners(t, mockStub)
+	indexCreated, ownersAfterIndexing := checkIndexAndOwners(t, mockStub.ChaincodeStub)
 	require.True(t, indexCreated)
 	require.Equal(t, 3, ownersAfterIndexing)
 }
@@ -118,7 +119,7 @@ func TestAutoBalanceIndexing(t *testing.T) {
 	user, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
 	require.NoError(t, err)
 
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
 
 	config := makeBaseTokenConfig(
 		"Test Token",
@@ -135,7 +136,7 @@ func TestAutoBalanceIndexing(t *testing.T) {
 	require.NoError(t, err)
 
 	// checking there's no owners
-	index, ownersAutoIndexed := checkIndexAndOwners(t, mockStub)
+	index, ownersAutoIndexed := checkIndexAndOwners(t, mockStub.ChaincodeStub)
 	require.False(t, index)
 	require.Equal(t, 0, ownersAutoIndexed)
 
@@ -163,7 +164,7 @@ func TestAutoBalanceIndexing(t *testing.T) {
 	dataIn, err := pb.Marshal(&pbfound.Batch{TxIDs: [][]byte{[]byte("testTxID")}})
 	require.NoError(t, err)
 
-	err = mocks.SetCreator(mockStub, BatchRobotCert)
+	err = mocks.SetCreator(mockStub.ChaincodeStub, BatchRobotCert)
 	require.NoError(t, err)
 
 	mockStub.GetFunctionAndParametersReturns("batchExecute", []string{string(dataIn)})
@@ -175,7 +176,7 @@ func TestAutoBalanceIndexing(t *testing.T) {
 	require.Equal(t, "", resp.Message)
 
 	// checking inverse balance appears
-	_, ownersAutoIndexed = checkIndexAndOwners(t, mockStub)
+	_, ownersAutoIndexed = checkIndexAndOwners(t, mockStub.ChaincodeStub)
 	require.Equal(t, 1, ownersAutoIndexed)
 }
 

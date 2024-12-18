@@ -10,6 +10,7 @@ import (
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/mocks"
+	"github.com/anoideaopen/foundation/mocks/mockstub"
 	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/token"
 	"github.com/stretchr/testify/require"
@@ -217,7 +218,8 @@ func TestContractMethods(t *testing.T) {
 
 	for _, test := range testCollection {
 		t.Run(test.name, func(t *testing.T) {
-			mockStub := mocks.NewMockStub(t)
+			mockStub := mockstub.NewMockStub(t)
+
 			owner, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
 			require.NoError(t, err)
 
@@ -230,13 +232,13 @@ func TestContractMethods(t *testing.T) {
 
 			// preparing mockStub
 			if test.needACLAccess {
-				mocks.ACLGetAccountInfo(t, mockStub, 0)
+				mocks.ACLGetAccountInfo(t, mockStub.ChaincodeStub, 0)
 			}
 
 			mockStub.GetStateReturnsOnCall(0, []byte(config), nil)
 
 			if test.prepareMockStubAdditional != nil {
-				test.prepareMockStubAdditional(t, mockStub, owner)
+				test.prepareMockStubAdditional(t, mockStub.ChaincodeStub, owner)
 			}
 
 			mockStub.GetFunctionAndParametersReturns(test.functionName, test.prepareFunctionParameters(owner))
@@ -258,7 +260,8 @@ func TestContractMethods(t *testing.T) {
 
 // TestInit - Checking that init with right mspId working
 func TestInit(t *testing.T) {
-	mockStub := mocks.NewMockStub(t)
+	mockStub := mockstub.NewMockStub(t)
+
 	owner, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
 	require.NoError(t, err)
 
@@ -271,7 +274,7 @@ func TestInit(t *testing.T) {
 
 	t.Run("[negative] Init with wrong cert", func(t *testing.T) {
 		mockStub.GetStringArgsReturns([]string{config})
-		err = mocks.SetCreator(mockStub, BatchRobotCert)
+		err = mocks.SetCreator(mockStub.ChaincodeStub, BatchRobotCert)
 		require.NoError(t, err)
 
 		resp := cc.Init(mockStub)
@@ -281,7 +284,7 @@ func TestInit(t *testing.T) {
 	t.Run("Init with correct cert", func(t *testing.T) {
 		mockStub.GetStringArgsReturns([]string{config})
 
-		err = mocks.SetCreatorCert(mockStub, mocks.TestCreatorMSP, mocks.AdminCert)
+		err = mocks.SetCreatorCert(mockStub.ChaincodeStub, mocks.TestCreatorMSP, mocks.AdminCert)
 		require.NoError(t, err)
 
 		resp := cc.Init(mockStub)

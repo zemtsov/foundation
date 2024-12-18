@@ -10,6 +10,7 @@ import (
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/mocks"
+	"github.com/anoideaopen/foundation/mocks/mockstub"
 	pbfound "github.com/anoideaopen/foundation/proto"
 	"github.com/anoideaopen/foundation/token"
 	"github.com/golang/protobuf/proto"
@@ -224,7 +225,7 @@ func TestQuery(t *testing.T) {
 
 	for _, test := range testCollection {
 		t.Run(test.name, func(t *testing.T) {
-			mockStub := mocks.NewMockStub(t)
+			mockStub := mockstub.NewMockStub(t)
 
 			issuer, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
 			require.NoError(t, err)
@@ -245,11 +246,11 @@ func TestQuery(t *testing.T) {
 			mockStub.GetStateReturnsOnCall(0, []byte(config), nil)
 
 			if test.needACLAccess {
-				mocks.ACLGetAccountInfo(t, mockStub, 0)
+				mocks.ACLGetAccountInfo(t, mockStub.ChaincodeStub, 0)
 			}
 
 			if test.prepareMockStubAdditional != nil {
-				test.prepareMockStubAdditional(t, mockStub, issuer, user1)
+				test.prepareMockStubAdditional(t, mockStub.ChaincodeStub, issuer, user1)
 			}
 
 			mockStub.GetFunctionAndParametersReturns(test.functionName, test.prepareFunctionParameters(user1, user2))
@@ -519,7 +520,7 @@ func TestAllowedBalanceInvoke(t *testing.T) {
 
 	for _, test := range testCollection {
 		t.Run(test.name, func(t *testing.T) {
-			mockStub := mocks.NewMockStub(t)
+			mockStub := mockstub.NewMockStub(t)
 
 			issuer, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
 			require.NoError(t, err)
@@ -554,24 +555,24 @@ func TestAllowedBalanceInvoke(t *testing.T) {
 			pendingMarshalled, err := proto.Marshal(pending)
 			require.NoError(t, err)
 
-			err = mocks.SetCreator(mockStub, BatchRobotCert)
+			err = mocks.SetCreator(mockStub.ChaincodeStub, BatchRobotCert)
 			require.NoError(t, err)
 
 			mockStub.GetStateReturnsOnCall(0, []byte(config), nil)
 			mockStub.GetStateReturnsOnCall(1, pendingMarshalled, nil)
 
 			if test.needACLAccess {
-				mocks.ACLGetAccountInfo(t, mockStub, 0)
+				mocks.ACLGetAccountInfo(t, mockStub.ChaincodeStub, 0)
 			}
 
 			if test.prepareMockStubAdditional != nil {
-				test.prepareMockStubAdditional(t, mockStub, issuer, user1)
+				test.prepareMockStubAdditional(t, mockStub.ChaincodeStub, issuer, user1)
 			}
 
 			dataIn, err := pb.Marshal(&pbfound.Batch{TxIDs: [][]byte{[]byte("testTxID")}})
 			require.NoError(t, err)
 
-			err = mocks.SetCreator(mockStub, BatchRobotCert)
+			err = mocks.SetCreator(mockStub.ChaincodeStub, BatchRobotCert)
 			require.NoError(t, err)
 
 			mockStub.GetFunctionAndParametersReturns("batchExecute", []string{string(dataIn)})
@@ -582,7 +583,7 @@ func TestAllowedBalanceInvoke(t *testing.T) {
 				require.Equal(t, test.resultMessage, resp.GetMessage())
 			} else {
 				require.Empty(t, resp.GetMessage())
-				test.checkPutState(t, mockStub, user1, user2, resp.GetPayload())
+				test.checkPutState(t, mockStub.ChaincodeStub, user1, user2, resp.GetPayload())
 			}
 		})
 	}
