@@ -1,11 +1,17 @@
 package unit
 
 import (
+	"net/http"
 	"testing"
 
+	"github.com/anoideaopen/foundation/core"
+	"github.com/anoideaopen/foundation/core/balance"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
-	"github.com/anoideaopen/foundation/mock"
+	"github.com/anoideaopen/foundation/mocks"
+	"github.com/anoideaopen/foundation/mocks/mockstub"
+	pbfound "github.com/anoideaopen/foundation/proto"
+	"github.com/hyperledger/fabric-protos-go/peer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,110 +31,231 @@ func (tt *TestToken) TxTokenBalanceBurnLocked(_ *types.Sender, address *types.Ad
 	return tt.TokenBalanceBurnLocked(address, amount, reason)
 }
 
-// TestTokenBalanceLockAndGetLocked - Checking that token balance can be locked
-func TestTokenBalanceLockAndGetLocked(t *testing.T) {
+func TestTokenBalances(t *testing.T) {
 	t.Parallel()
 
-	lm := mock.NewLedger(t)
-	issuer := lm.NewWallet()
+	testCollection := []struct {
+		name                string
+		functionName        string
+		funcPrepareMockStub func(
+			t *testing.T,
+			mockStub *mockstub.MockStub,
+			user1 *mocks.UserFoundation,
+			user2 *mocks.UserFoundation,
+		) []string
+		funcInvokeChaincode func(
+			cc *core.Chaincode,
+			mockStub *mockstub.MockStub,
+			functionName string,
+			issuer *mocks.UserFoundation,
+			user1 *mocks.UserFoundation,
+			parameters ...string,
+		) peer.Response
+		funcCheckResult func(
+			t *testing.T,
+			mockStub *mockstub.MockStub,
+			user1 *mocks.UserFoundation,
+			user2 *mocks.UserFoundation,
+			resp peer.Response,
+		)
+	}{
+		{
+			name:         "Lock balance",
+			functionName: "tokenBalanceLock",
+			funcPrepareMockStub: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation) []string {
+				key, err := mockStub.CreateCompositeKey(balance.BalanceTypeToken.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	config := makeBaseTokenConfig("tt", "TT", 8,
-		issuer.Address(), "", "", "", nil)
-	initMsg := lm.NewCC("tt", &TestToken{}, config)
-	require.Empty(t, initMsg)
+				mockStub.GetStateCallsMap[key] = big.NewInt(1000).Bytes()
 
-	user1 := lm.NewWallet()
-	err := issuer.RawSignedInvokeWithErrorReturned("tt", "emissionAdd", user1.Address(), "1000")
-	require.NoError(t, err)
+				return []string{user1.AddressBase58Check, "500"}
+			},
+			funcInvokeChaincode: func(cc *core.Chaincode, mockStub *mockstub.MockStub, functionName string, issuer *mocks.UserFoundation, user1 *mocks.UserFoundation, parameters ...string) peer.Response {
+				_, resp := mockStub.TxInvokeChaincodeSigned(cc, functionName, issuer, "", "", "", parameters...)
+				return resp
+			},
+			funcCheckResult: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation, resp peer.Response) {
+				balanceKey, err := mockStub.CreateCompositeKey(balance.BalanceTypeToken.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	t.Run("Token balance get test", func(t *testing.T) {
-		issuer.SignedInvoke("tt", "tokenBalanceLock", user1.Address(), "500")
-		user1.BalanceShouldBe("tt", 500)
-		lockedBalance := user1.Invoke(testTokenCCName, "lockedBalanceOf", user1.Address())
-		require.Equal(t, lockedBalance, "\"500\"")
-	})
-}
+				lockedBalanceKey, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-// TestTokenBalanceUnlock - Checking that token balance can be unlocked
-func TestTokenBalanceUnlock(t *testing.T) {
-	t.Parallel()
+				balanceChecked := false
+				lockedChecked := false
 
-	ledger := mock.NewLedger(t)
-	owner := ledger.NewWallet()
+				for i := 0; i < mockStub.PutStateCallCount(); i++ {
+					putStateKey, value := mockStub.PutStateArgsForCall(i)
+					if putStateKey == balanceKey {
+						require.Equal(t, big.NewInt(500), new(big.Int).SetBytes(value))
+						balanceChecked = true
+					}
+					if putStateKey == lockedBalanceKey {
+						require.Equal(t, big.NewInt(500), new(big.Int).SetBytes(value))
+						lockedChecked = true
+					}
+				}
 
-	config := makeBaseTokenConfig(testTokenName, testTokenSymbol, 8,
-		owner.Address(), "", "", "", nil)
-	initMsg := ledger.NewCC(testTokenCCName, &TestToken{}, config)
-	require.Empty(t, initMsg)
+				require.True(t, balanceChecked && lockedChecked)
+			},
+		},
+		{
+			name:         "Query locked balance",
+			functionName: "lockedBalanceOf",
+			funcPrepareMockStub: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation) []string {
+				key, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	user1 := ledger.NewWallet()
-	owner.SignedInvoke(testTokenCCName, "emissionAdd", user1.Address(), "1000")
-	owner.SignedInvoke(testTokenCCName, "tokenBalanceLock", user1.Address(), "500")
+				mockStub.GetStateCallsMap[key] = big.NewInt(500).Bytes()
 
-	user1.BalanceShouldBe(testTokenCCName, 500)
-	lockedBalance := user1.Invoke(testTokenCCName, "lockedBalanceOf", user1.Address())
-	require.Equal(t, lockedBalance, "\"500\"")
+				return []string{user1.AddressBase58Check}
+			},
+			funcInvokeChaincode: func(cc *core.Chaincode, mockStub *mockstub.MockStub, functionName string, issuer *mocks.UserFoundation, user1 *mocks.UserFoundation, parameters ...string) peer.Response {
+				return mockStub.QueryChaincode(cc, functionName, parameters...)
+			},
+			funcCheckResult: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation, resp peer.Response) {
+				require.Equal(t, "\"500\"", string(resp.GetPayload()))
+			},
+		},
+		{
+			name:         "Unlock balance",
+			functionName: "tokenBalanceUnlock",
+			funcPrepareMockStub: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation) []string {
+				key, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	t.Run("Token balance unlock test", func(t *testing.T) {
-		owner.SignedInvoke(testTokenCCName, "tokenBalanceUnlock", user1.Address(), "500")
-		lockedBalance = user1.Invoke(testTokenCCName, "lockedBalanceOf", user1.Address())
-		require.Equal(t, lockedBalance, "\"0\"")
-		user1.BalanceShouldBe(testTokenCCName, 1000)
-	})
-}
+				mockStub.GetStateCallsMap[key] = big.NewInt(1000).Bytes()
 
-// TestTokenBalanceTransferLocked - Checking that locked token balance can be transferred
-func TestTokenBalanceTransferLocked(t *testing.T) {
-	t.Parallel()
+				return []string{user1.AddressBase58Check, "500"}
+			},
+			funcInvokeChaincode: func(cc *core.Chaincode, mockStub *mockstub.MockStub, functionName string, issuer *mocks.UserFoundation, user1 *mocks.UserFoundation, parameters ...string) peer.Response {
+				_, resp := mockStub.TxInvokeChaincodeSigned(cc, functionName, issuer, "", "", "", parameters...)
+				return resp
+			},
+			funcCheckResult: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation, resp peer.Response) {
+				balanceKey, err := mockStub.CreateCompositeKey(balance.BalanceTypeToken.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	ledger := mock.NewLedger(t)
-	owner := ledger.NewWallet()
+				lockedBalanceKey, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	tt := &TestToken{}
-	ttConfig := makeBaseTokenConfig(testTokenName, testTokenSymbol, 8,
-		owner.Address(), "", "", "", nil)
-	ledger.NewCC(testTokenCCName, tt, ttConfig)
+				balanceChecked := false
+				lockedChecked := false
 
-	user1 := ledger.NewWallet()
-	user2 := ledger.NewWallet()
+				for i := 0; i < mockStub.PutStateCallCount(); i++ {
+					putStateKey, value := mockStub.PutStateArgsForCall(i)
+					if putStateKey == balanceKey {
+						require.Equal(t, big.NewInt(500), new(big.Int).SetBytes(value))
+						balanceChecked = true
+					}
+					if putStateKey == lockedBalanceKey {
+						require.Equal(t, big.NewInt(500), new(big.Int).SetBytes(value))
+						lockedChecked = true
+					}
+				}
 
-	owner.SignedInvoke(testTokenCCName, "emissionAdd", user1.Address(), "1000")
-	owner.SignedInvoke(testTokenCCName, "tokenBalanceLock", user1.Address(), "500")
-	user1.BalanceShouldBe(testTokenCCName, 500)
-	lockedBalance := user1.Invoke(testTokenCCName, "lockedBalanceOf", user1.Address())
-	require.Equal(t, lockedBalance, "\"500\"")
+				require.True(t, balanceChecked && lockedChecked)
+			},
+		},
+		{
+			name:         "Transfer locked balance",
+			functionName: "tokenBalanceTransferLocked",
+			funcPrepareMockStub: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation) []string {
+				key, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	t.Run("Locked balance transfer test", func(t *testing.T) {
-		owner.SignedInvoke(testTokenCCName, "tokenBalanceTransferLocked", user1.Address(), user2.Address(), "500", "transfer")
-		lockedBalanceUser1 := user1.Invoke(testTokenCCName, "lockedBalanceOf", user1.Address())
-		require.Equal(t, lockedBalanceUser1, "\"0\"")
-		user2.BalanceShouldBe(testTokenCCName, 500)
-	})
-}
+				mockStub.GetStateCallsMap[key] = big.NewInt(1000).Bytes()
 
-// TestTokenBalanceBurnLocked - Checking that locked token balance can be burned
-func TestTokenBalanceBurnLocked(t *testing.T) {
-	t.Parallel()
+				return []string{user1.AddressBase58Check, user2.AddressBase58Check, "300", "test transfer locked balance"}
+			},
+			funcInvokeChaincode: func(cc *core.Chaincode, mockStub *mockstub.MockStub, functionName string, issuer *mocks.UserFoundation, user1 *mocks.UserFoundation, parameters ...string) peer.Response {
+				_, resp := mockStub.TxInvokeChaincodeSigned(cc, functionName, issuer, "", "", "", parameters...)
+				return resp
+			},
+			funcCheckResult: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation, resp peer.Response) {
+				user1BalanceKey, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	ledger := mock.NewLedger(t)
-	owner := ledger.NewWallet()
+				user2BalanceKey, err := mockStub.CreateCompositeKey(balance.BalanceTypeToken.String(), []string{user2.AddressBase58Check})
+				require.NoError(t, err)
 
-	tt := &TestToken{}
-	ttConfig := makeBaseTokenConfig(testTokenName, testTokenSymbol, 8,
-		owner.Address(), "", "", "", nil)
-	ledger.NewCC(testTokenCCName, tt, ttConfig)
+				balanceChecked := false
+				lockedChecked := false
 
-	user1 := ledger.NewWallet()
+				for i := 0; i < mockStub.PutStateCallCount(); i++ {
+					putStateKey, value := mockStub.PutStateArgsForCall(i)
+					if putStateKey == user1BalanceKey {
+						require.Equal(t, big.NewInt(700), new(big.Int).SetBytes(value))
+						balanceChecked = true
+					}
+					if putStateKey == user2BalanceKey {
+						require.Equal(t, big.NewInt(300), new(big.Int).SetBytes(value))
+						lockedChecked = true
+					}
+				}
 
-	owner.SignedInvoke(testTokenCCName, "emissionAdd", user1.Address(), "1000")
-	owner.SignedInvoke(testTokenCCName, "tokenBalanceLock", user1.Address(), "500")
-	user1.BalanceShouldBe(testTokenCCName, 500)
-	lockedBalance := user1.Invoke(testTokenCCName, "lockedBalanceOf", user1.Address())
-	require.Equal(t, lockedBalance, "\"500\"")
+				require.True(t, balanceChecked && lockedChecked)
+			},
+		},
+		{
+			name:         "Burn locked balance",
+			functionName: "tokenBalanceBurnLocked",
+			funcPrepareMockStub: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation) []string {
+				key, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
 
-	t.Run("Locked balance burn test", func(t *testing.T) {
-		owner.SignedInvoke(testTokenCCName, "tokenBalanceBurnLocked", user1.Address(), "500", "burn")
-		lockedBalanceUser1 := user1.Invoke(testTokenCCName, "lockedBalanceOf", user1.Address())
-		require.Equal(t, lockedBalanceUser1, "\"0\"")
-	})
+				mockStub.GetStateCallsMap[key] = big.NewInt(1000).Bytes()
+
+				return []string{user1.AddressBase58Check, "500", "test token burning locked"}
+			},
+			funcInvokeChaincode: func(cc *core.Chaincode, mockStub *mockstub.MockStub, functionName string, issuer *mocks.UserFoundation, user1 *mocks.UserFoundation, parameters ...string) peer.Response {
+				_, resp := mockStub.TxInvokeChaincodeSigned(cc, functionName, issuer, "", "", "", parameters...)
+				return resp
+			},
+			funcCheckResult: func(t *testing.T, mockStub *mockstub.MockStub, user1 *mocks.UserFoundation, user2 *mocks.UserFoundation, resp peer.Response) {
+				lockedBalanceKey, err := mockStub.CreateCompositeKey(balance.BalanceTypeTokenLocked.String(), []string{user1.AddressBase58Check})
+				require.NoError(t, err)
+
+				lockedChecked := false
+
+				for i := 0; i < mockStub.PutStateCallCount(); i++ {
+					putStateKey, value := mockStub.PutStateArgsForCall(i)
+					if putStateKey == lockedBalanceKey {
+						require.Equal(t, big.NewInt(500), new(big.Int).SetBytes(value))
+						lockedChecked = true
+					}
+				}
+
+				require.True(t, lockedChecked)
+			},
+		},
+	}
+
+	for _, test := range testCollection {
+		t.Run(test.name, func(t *testing.T) {
+			mockStub := mockstub.NewMockStub(t)
+
+			issuer, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
+			require.NoError(t, err)
+
+			user1, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
+			require.NoError(t, err)
+
+			user2, err := mocks.NewUserFoundation(pbfound.KeyType_ed25519)
+			require.NoError(t, err)
+
+			mockStub.CreateAndSetConfig("tt", "TT", 8,
+				issuer.AddressBase58Check, "", "", "", nil)
+
+			cc, err := core.NewCC(&TestToken{})
+			require.NoError(t, err)
+
+			parameters := test.funcPrepareMockStub(t, mockStub, user1, user2)
+
+			resp := test.funcInvokeChaincode(cc, mockStub, test.functionName, issuer, user1, parameters...)
+			require.Equal(t, int32(http.StatusOK), resp.GetStatus())
+			require.Empty(t, resp.GetMessage())
+			test.funcCheckResult(t, mockStub, user1, user2, resp)
+		})
+	}
 }
