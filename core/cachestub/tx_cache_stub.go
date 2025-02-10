@@ -73,7 +73,6 @@ func (bts *TxCacheStub) AddAccountingRecord(
 	if amount.Cmp(big.NewInt(0)) == 0 {
 		return
 	}
-	
 	bts.Accounting = append(bts.Accounting, &proto.AccountingRecord{
 		Token:                token,
 		Sender:               from.Bytes(),
