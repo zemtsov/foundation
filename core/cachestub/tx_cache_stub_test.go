@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anoideaopen/foundation/core/balance"
+	"github.com/anoideaopen/foundation/core/types"
+	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/mocks"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/stretchr/testify/require"
@@ -362,6 +365,53 @@ func TestTxStub(t *testing.T) {
 		require.Equal(t, 5, stateStub.PutStateCallCount())
 		require.Equal(t, 3, stateStub.DelStateCallCount())
 	})
+}
+
+func TestAccountingRecord(t *testing.T) {
+	cases := []struct {
+		name            string
+		amount          *big.Int
+		expectedRecords int
+	}{
+		{
+			name:            "accounting record with amount",
+			amount:          big.NewInt(1),
+			expectedRecords: 1,
+		},
+		{
+			name:            "accounting record with zero amount",
+			amount:          big.NewInt(0),
+			expectedRecords: 0,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			const (
+				tokenName = "testToken"
+				reason    = "testReason"
+			)
+
+			stateStub := &mocks.ChaincodeStub{}
+			// creating batch cache stub
+			batchStub := NewBatchCacheStub(stateStub)
+			// creating tx cache stub
+			txTime := createUtcTimestamp()
+			txStub := batchStub.NewTxCacheStub(txID1, txTime)
+
+			txStub.AddAccountingRecord(
+				tokenName,
+				&types.Address{},
+				&types.Address{},
+				c.amount,
+				balance.BalanceTypeToken,
+				balance.BalanceTypeToken,
+				reason,
+			)
+
+			require.Equal(t, c.expectedRecords, len(txStub.Accounting))
+		})
+	}
 }
 
 // CreateUtcTimestamp returns a Google/protobuf/Timestamp in UTC
