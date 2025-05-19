@@ -103,6 +103,10 @@ func (bc *BaseContract) AllowedBalanceGetLocked(token string, address *types.Add
 	return ledger.AllowedBalanceGetLocked(bc.GetStub(), token, address)
 }
 
+func (bc *BaseContract) AllowedBalanceGetAllLocked(address *types.Address) (map[string]string, error) {
+	return ledger.AllowedBalanceLockedGetAll(bc.GetStub(), address)
+}
+
 func (bc *BaseContract) AllowedBalanceLock(token string, address *types.Address, amount *big.Int, opts ...ledger.LockOpt) error {
 	return ledger.AllowedBalanceLock(bc.GetStub(), token, token, address, amount, opts...)
 }
