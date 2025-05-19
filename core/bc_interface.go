@@ -4,7 +4,6 @@ import (
 	"embed"
 
 	"github.com/anoideaopen/foundation/core/config"
-	"github.com/anoideaopen/foundation/core/ledger"
 	"github.com/anoideaopen/foundation/core/routing"
 	"github.com/anoideaopen/foundation/core/telemetry"
 	"github.com/anoideaopen/foundation/core/types"
@@ -37,12 +36,6 @@ type BaseContractInterface interface { //nolint:interfacebloat
 	AllowedBalanceSub(token string, address *types.Address, amount *big.Int, reason string) error
 
 	AllowedBalanceGetAll(address *types.Address) (map[string]string, error)
-
-	AllowedBalanceLock(token string, address *types.Address, amount *big.Int, opts ...ledger.LockOpt) error
-	AllowedBalanceUnLock(token string, address *types.Address, amount *big.Int, opts ...ledger.LockOpt) error
-	AllowedBalanceTransferLocked(token string, from *types.Address, to *types.Address, amount *big.Int, reason string) error
-	AllowedBalanceGetLocked(token string, address *types.Address) (*big.Int, error)
-	AllowedBalanceGetAllLocked(address *types.Address) (map[string]string, error)
 
 	IndustrialBalanceGet(address *types.Address) (map[string]string, error)
 	IndustrialBalanceTransfer(token string, from *types.Address, to *types.Address, amount *big.Int, reason string) error

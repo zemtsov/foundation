@@ -6,6 +6,7 @@ import (
 
 	"github.com/anoideaopen/foundation/core"
 	"github.com/anoideaopen/foundation/core/balance"
+	"github.com/anoideaopen/foundation/core/ledger"
 	"github.com/anoideaopen/foundation/core/types"
 	"github.com/anoideaopen/foundation/core/types/big"
 	"github.com/anoideaopen/foundation/mocks"
@@ -50,7 +51,7 @@ func (tt *QueryTestToken) QueryAllowedBalanceGetAll(address *types.Address) (map
 }
 
 func (tt *QueryTestToken) QueryAllowedBalanceGetAllLocked(address *types.Address) (map[string]string, error) {
-	return tt.AllowedBalanceGetAllLocked(address)
+	return ledger.AllowedBalanceLockedGetAll(tt.GetStub(), address)
 }
 
 type InvokeTestToken struct {
@@ -214,7 +215,8 @@ func TestQuery(t *testing.T) {
 					Value: big.NewInt(200).Bytes(),
 				}, nil)
 			},
-		}, {
+		},
+		{
 			name:         "Query allowed balances get all locked",
 			functionName: "allowedBalanceGetAllLocked",
 			prepareFunctionParameters: func(user1, user2 *mocks.UserFoundation) []string {
